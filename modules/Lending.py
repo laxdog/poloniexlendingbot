@@ -145,92 +145,132 @@ def lend_all():
         sleep_time = sleep_time_active
 
 
-def lend_cur(active_cur, total_lended, lending_balances):
-    currency_usable = 0
-    active_cur_test_balance = Decimal(lending_balances[active_cur])
-    if active_cur in total_lended:
-        active_cur_test_balance += Decimal(total_lended[active_cur])
-
-    # min daily rate can be changed per currency
+def get_min_daily_rate(cur):
     cur_min_daily_rate = min_daily_rate
-    if active_cur in coin_cfg:
-        if coin_cfg[active_cur]['maxactive'] == 0:
-            log.log('maxactive amount for ' + active_cur + ' set to 0, won\'t lend.')
+    if cur in coin_cfg:
+        if coin_cfg[cur]['maxactive'] == 0:
+            log.log('maxactive amount for ' + cur + ' set to 0, won\'t lend.')
             return 0
-        cur_min_daily_rate = coin_cfg[active_cur]['minrate']
-        log.log('Using custom mindailyrate ' + str(coin_cfg[active_cur]['minrate'] * 100) + '% for ' + active_cur)
+        cur_min_daily_rate = coin_cfg[cur]['minrate']
+        log.log('Using custom mindailyrate ' + str(coin_cfg[cur]['minrate'] * 100) + '% for ' + cur)
     if Analysis:
-        recommended_min = Analysis.get_rate_suggestion(active_cur)
+        recommended_min = Analysis.get_rate_suggestion(cur)
         if cur_min_daily_rate < recommended_min:
             cur_min_daily_rate = recommended_min
+    return cur_min_daily_rate
 
-    # log total coin
-    log.updateStatusValue(active_cur, "totalCoins", (Decimal(active_cur_test_balance)))
 
+def construct_order_book(active_cur):
     # make sure we have a request limit for this currency
     if active_cur not in loanOrdersRequestLimit:
         loanOrdersRequestLimit[active_cur] = defaultLoanOrdersRequestLimit
 
     loans = api.return_loan_orders(active_cur, loanOrdersRequestLimit[active_cur])
-    loans_length = len(loans['offers'])
-    if hide_coins and Decimal(loans['offers'][0]['rate']) < Decimal(cur_min_daily_rate):
-        log.log("Not lending " + active_cur + " due to low rate.")
+    if len(loans) == 0:
+        return False
+
+    rate_book = []
+    volume_book = []
+    for offer in loans['offers']:
+        rate_book.append(offer['rate'])
+        volume_book.append(offer['amount'])
+    return [rate_book, volume_book]
+
+
+def get_gap_rate(active_cur, gap_pct, order_book, cur_active_bal):
+    gap_expected = gap_pct * cur_active_bal / 100
+    gap_sum = 0
+    i = -1
+    while gap_sum < gap_expected:
+        i += 1
+        if i == len(order_book[1]) and len(order_book[1]) == loanOrdersRequestLimit[active_cur]:
+            loanOrdersRequestLimit[active_cur] += defaultLoanOrdersRequestLimit
+            log.log(active_cur + ': Not enough offers in response, adjusting request limit to ' + str(
+                loanOrdersRequestLimit[active_cur]))
+            return 0
+        gap_sum += float(order_book[1][i])
+    return Decimal(order_book[0][i])
+
+
+def get_order_amounts(spread, cur_active_bal):
+    cur_spread_lend = int(spread)  # Checks if active_bal can't be spread that many times, and may go down to 1.
+    while cur_active_bal < (cur_spread_lend * min_loan_size):
+        cur_spread_lend -= 1
+    i = 0
+    order_amounts = []
+    while i < cur_spread_lend:
+        order_amounts.append(cur_active_bal / cur_spread_lend)
+        i += 1
+    return order_amounts
+
+
+def construct_orders(cur, cur_active_bal):
+    order_amounts = get_order_amounts(spread_lend, cur_active_bal)
+    order_book = construct_order_book(cur)
+    bottom_rate = get_gap_rate(cur, gap_bottom, order_book, cur_active_bal)
+    top_rate = get_gap_rate(cur, gap_top, order_book, cur_active_bal)
+
+    gap_diff = top_rate - bottom_rate
+    if len(order_amounts) == 1:
+        rate_step = 0
+    else:
+        rate_step = gap_diff / (len(order_amounts) - 1)
+
+    order_rates = []
+    i = 0
+    while i < len(order_amounts):
+        new_rate = bottom_rate + (rate_step * i)
+        order_rates.append(new_rate)
+        i += 1
+    # Condensing and logic'ing time
+    amounts = sum(order_amounts)
+    for rate in order_rates:
+        if rate > max_daily_rate:
+            order_rates[rate] = max_daily_rate
+    new_order_rates = sorted(list(set(order_rates)))
+    new_order_amounts = []
+    i = 0
+    while i < len(new_order_rates):
+        new_amount = Data.truncate(amounts / len(new_order_rates), 8)
+        new_order_amounts.append(new_amount)
+        i += 1
+    return [new_order_amounts, new_order_rates]
+
+
+def lend_cur(active_cur, total_lended, lending_balances):
+    active_cur_total_balance = Decimal(lending_balances[active_cur])
+    if active_cur in total_lended:
+        active_cur_total_balance += Decimal(total_lended[active_cur])
+
+    # min daily rate can be changed per currency
+    cur_min_daily_rate = get_min_daily_rate(active_cur)
+
+    # log total coin
+    log.updateStatusValue(active_cur, "totalCoins", (Decimal(active_cur_total_balance)))
+    order_book = construct_order_book(active_cur)
+    if not order_book or len(order_book[0]) == 0:
         return 0
 
-    active_bal = MaxToLend.amount_to_lend(active_cur_test_balance, active_cur,
-                                          Decimal(lending_balances[active_cur]),
-                                          Decimal(loans['offers'][0]['rate']))
+    active_bal = MaxToLend.amount_to_lend(active_cur_total_balance, active_cur, Decimal(lending_balances[active_cur]),
+                                          Decimal(order_book[0][0]))
 
     if float(active_bal) > min_loan_size:  # Make sure sleeptimer is set to active if any currencies can lend.
         currency_usable = 1
     else:
-        return currency_usable  # Return early to end function.
+        return 0  # Return early to end function.
 
-    lower_sum = Decimal(0)  # sum
-    order_num = int(0)  # offer book iterator
-    spread_steps = int(0)  # spread step count
-    lent = Decimal(0)
-    # in case of empty lendbook, lend at max
-    cur_spread_lend = int(spread_lend)  # Checks if active_bal can't be spread that many times, and may go down to 1.
-    while active_bal < (cur_spread_lend * min_loan_size):
-        cur_spread_lend -= 1
-    step_pct = (gap_top - gap_bottom) / cur_spread_lend
-
-    active_plus_lended = Decimal(active_bal)
-    if active_cur in total_lended:
-        active_plus_lended += Decimal(total_lended[active_cur])
-    if loans_length == 0:
-        create_lend_offer(active_cur, Decimal(active_bal) - lent, max_daily_rate)
-    for offer in loans['offers']:
-        lower_sum += Decimal(offer['amount'])
-        upper_sum = lower_sum
-        while True:
-            sum_diff = upper_sum - lower_sum
-            gap_multiplier = gap_bottom / 100 + (step_pct / 100 * spread_steps)
-            if upper_sum > active_plus_lended * gap_multiplier and Decimal(offer['rate']) > cur_min_daily_rate:
-                spread_steps += 1
-                upper_sum += Decimal(active_bal) / cur_spread_lend
-            else:
-                create_lend_offer(active_cur, sum_diff, offer['rate'])
-                lent += sum_diff.quantize(SATOSHI)
-                break
-            if spread_steps == cur_spread_lend:
-                create_lend_offer(active_cur, Decimal(active_bal) - lent, offer['rate'])
-                break
-        if spread_steps == cur_spread_lend:
-            break
-        order_num += 1
-        if order_num == loans_length:  # end of the offers
-            if loans_length < loanOrdersRequestLimit[active_cur]:
-                # lend at max
-                create_lend_offer(active_cur, Decimal(active_bal) - lent, max_daily_rate)
-            else:
-                # increase limit for currency to get a more accurate response
-                loanOrdersRequestLimit[active_cur] += defaultLoanOrdersRequestLimit
-                log.log(active_cur + ': Not enough offers in response, adjusting request limit to ' + str(
-                    loanOrdersRequestLimit[active_cur]))
-                # repeat currency
-                lend_cur(active_cur, total_lended, lending_balances)
+    orders = construct_orders(active_cur, active_bal)  # Construct all the potential orders
+    i = 0
+    while i < len(orders[0]):  # Iterate through prepped orders and create them if they work
+        below_min = orders[1][i] < Decimal(cur_min_daily_rate)
+        if hide_coins and below_min:
+            log.log("Not lending " + active_cur + " due to low rate.")
+            return 0
+        elif below_min:
+            create_lend_offer(active_cur, orders[0][i], min_daily_rate)
+        else:
+            create_lend_offer(active_cur, orders[0][i], orders[1][i])
+        i += 1  # Finally, move to next order.
     return currency_usable
 
 
