@@ -79,7 +79,6 @@ def set_sleep_time(usable):
 
 
 def get_min_loan_size(currency):
-    global min_loan_sizes
     if currency not in min_loan_sizes:
         return min_loan_size
     return min_loan_sizes[currency]
@@ -243,7 +242,7 @@ def construct_orders(cur, cur_active_bal):
     i = 0
     while i < len(new_order_rates):
         new_amount = Data.truncate(cur_active_bal / len(new_order_rates), 8)
-        new_order_amounts.append(new_amount)
+        new_order_amounts.append(Decimal(new_amount))
         i += 1
     remainder = cur_active_bal - sum(new_order_amounts)
     if remainder > 0:  # If truncating causes remainder, add that to first order.
