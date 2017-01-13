@@ -20,6 +20,7 @@ gap_top = 0
 xday_threshold = 0
 xdays = 0
 min_loan_size = 0
+min_loan_sizes = {}
 end_date = None
 coin_cfg = None
 dry_run = 0
@@ -54,7 +55,7 @@ def init(cfg, api1, log1, data, maxtolend, dry_run1, analysis):
     gap_top = Decimal(Config.get("BOT", "gaptop", None, 0))
     xday_threshold = Decimal(Config.get("BOT", "xdaythreshold", None, 0.003, 5)) / 100
     xdays = str(Config.get("BOT", "xdays", None, 2, 60))
-    min_loan_size = Decimal(Config.get("BOT", 'minloansize', None, 0.001))
+    min_loan_size = Decimal(Config.get("BOT", 'minloansize', None, 0.01))
     end_date = Config.get('BOT', 'endDate')
     coin_cfg = Config.get_coin_cfg()
     dry_run = dry_run1
@@ -69,10 +70,17 @@ def get_sleep_time():
     return sleep_time
 
 
+def get_min_loan_size(currency):
+    global min_loan_sizes
+    if currency not in min_loan_sizes:
+        return min_loan_size
+    return min_loan_sizes[currency]
+
+
 def create_lend_offer(currency, amt, rate):
     days = '2'
     # if (min_daily_rate - 0.000001) < rate and Decimal(amt) > min_loan_size:
-    if float(amt) > min_loan_size:
+    if float(amt) > get_min_loan_size(currency):
         if float(rate) > 0.0001:
             rate = float(rate) - 0.000001  # lend offer just bellow the competing one
         amt = "%.8f" % Decimal(amt)
@@ -112,8 +120,8 @@ def cancel_all():
             for offer in loan_offers[CUR]:
                 cur_sum += float(offer['amount'])
         else:
-            cur_sum = float(min_loan_size) + 1
-        if cur_sum >= float(min_loan_size):
+            cur_sum = float(get_min_loan_size(CUR)) + 1
+        if cur_sum >= float(get_min_loan_size(CUR)):
             for offer in loan_offers[CUR]:
                 if not dry_run:
                     try:
@@ -195,9 +203,9 @@ def get_gap_rate(active_cur, gap_pct, order_book, cur_active_bal):
     return Decimal(order_book[0][i])
 
 
-def get_order_amounts(spread, cur_active_bal):
+def get_order_amounts(spread, cur_active_bal, active_cur):
     cur_spread_lend = int(spread)  # Checks if active_bal can't be spread that many times, and may go down to 1.
-    while cur_active_bal < (cur_spread_lend * min_loan_size):
+    while cur_active_bal < (cur_spread_lend * get_min_loan_size(active_cur)):
         cur_spread_lend -= 1
     i = 0
     order_amounts = []
@@ -208,7 +216,7 @@ def get_order_amounts(spread, cur_active_bal):
 
 
 def construct_orders(cur, cur_active_bal):
-    order_amounts = get_order_amounts(spread_lend, cur_active_bal)
+    order_amounts = get_order_amounts(spread_lend, cur_active_bal, cur)
     order_book = construct_order_book(cur)
     bottom_rate = get_gap_rate(cur, gap_bottom, order_book, cur_active_bal)
     top_rate = get_gap_rate(cur, gap_top, order_book, cur_active_bal)
@@ -257,7 +265,7 @@ def lend_cur(active_cur, total_lended, lending_balances):
     active_bal = MaxToLend.amount_to_lend(active_cur_total_balance, active_cur, Decimal(lending_balances[active_cur]),
                                           Decimal(order_book[0][0]))
 
-    if float(active_bal) > min_loan_size:  # Make sure sleeptimer is set to active if any currencies can lend.
+    if float(active_bal) > get_min_loan_size(active_cur):  # Make sure sleeptimer is set to active if any cur can lend.
         currency_usable = 1
     else:
         return 0  # Return early to end function.
@@ -270,9 +278,23 @@ def lend_cur(active_cur, total_lended, lending_balances):
             log.log("Not lending " + active_cur + " due to low rate.")
             return 0
         elif below_min:
-            create_lend_offer(active_cur, orders[0][i], min_daily_rate)
+            rate = min_daily_rate
         else:
-            create_lend_offer(active_cur, orders[0][i], orders[1][i])
+            rate = orders[1][i]
+        try:
+            create_lend_offer(active_cur, orders[0][i], rate)
+        except Exception as msg:
+            if "Amount must be at least " in str(msg):
+                import re
+                results = re.findall('[-+]?([0-9]*\.[0-9]+|[0-9]+)', str(msg))
+                for result in results:
+                    if result:
+                        min_loan_sizes[active_cur] = result
+                        log.log(active_cur + "'s min_loan_size has been increased to the detected min: " + result)
+                return lend_cur(active_cur, total_lended, lending_balances)  # Redo cur with new min.
+            else:
+                raise msg
+
         i += 1  # Finally, move to next order.
     return currency_usable
 

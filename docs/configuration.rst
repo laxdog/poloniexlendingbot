@@ -125,9 +125,10 @@ Very few situations require you to change these settings.
 
 ``minloansize`` is the minimum size that a bot will make a loan at.
 
-- Default value: 0.001 of a coin
-- Allowed range: 0.001 and up.
+- Default value: 0.01 of a coin
+- Allowed range: 0.01 and up.
 - If you dislike loan fragmentation, then this will make the minimum for each loan larger.
+- Automatically adjusts to at least meet the minimum of each coin.
 
 ``KeepStuckOrders`` If True, keeps orders that are "stuck" in the market instead of canceling them.
 
