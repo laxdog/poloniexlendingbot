@@ -138,7 +138,10 @@ def lend_all():
     usable_currencies = 0
     global sleep_time  # We need global var to edit sleeptime
     for cur in lending_balances:
-        usable_currencies += lend_cur(cur, total_lended, lending_balances)
+        try:
+            usable_currencies += lend_cur(cur, total_lended, lending_balances)
+        except StopIteration:  # Restart lending if we stop to raise the request limit.
+            lend_all()
     if usable_currencies == 0:  # After loop, if no currencies had enough to lend, use inactive sleep time.
         sleep_time = sleep_time_inactive
     else:  # Else, use active sleep time.
@@ -187,7 +190,7 @@ def get_gap_rate(active_cur, gap_pct, order_book, cur_active_bal):
             loanOrdersRequestLimit[active_cur] += defaultLoanOrdersRequestLimit
             log.log(active_cur + ': Not enough offers in response, adjusting request limit to ' + str(
                 loanOrdersRequestLimit[active_cur]))
-            return 0
+            raise StopIteration
         gap_sum += float(order_book[1][i])
     return Decimal(order_book[0][i])
 
