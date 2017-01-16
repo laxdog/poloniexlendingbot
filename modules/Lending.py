@@ -144,7 +144,7 @@ def lend_all():
     total_lended = Data.get_total_lended()[0]
     lending_balances = api.return_available_account_balances("lending")['lending']
     if dry_run:  # just fake some numbers, if dryrun (testing)
-        lending_balances.update(Data.get_on_order_balances())
+        lending_balances = Data.get_on_order_balances()
 
     # Fill the (maxToLend) balances on the botlog.json for display it on the web
     for key in sorted(total_lended):
