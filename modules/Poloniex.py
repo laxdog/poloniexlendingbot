@@ -46,7 +46,7 @@ class Poloniex:
             time_since_oldest_req = now - self.req_time_log[0]
             # check if oldest request is more than 1sec ago
             if time_since_oldest_req < 1:
-                print self.req_time_log.get()
+                # print self.req_time_log.get()
                 # uncomment to debug
                 # print "Waiting %s sec to keep api request rate" % str(1 - time_since_oldest_req)
                 # print "Req: %d  6th Req: %d  Diff: %f sec" %(now, self.req_time_log[0], time_since_oldest_req)
