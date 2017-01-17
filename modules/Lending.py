@@ -295,7 +295,7 @@ def lend_cur(active_cur, total_lended, lending_balances):
                 results = re.findall('[-+]?([0-9]*\.[0-9]+|[0-9]+)', str(msg))
                 for result in results:
                     if result:
-                        min_loan_sizes[active_cur] = result
+                        min_loan_sizes[active_cur] = float(result)
                         log.log(active_cur + "'s min_loan_size has been increased to the detected min: " + result)
                 return lend_cur(active_cur, total_lended, lending_balances)  # Redo cur with new min.
             else:
