@@ -81,7 +81,7 @@ def set_sleep_time(usable):
 def get_min_loan_size(currency):
     if currency not in min_loan_sizes:
         return min_loan_size
-    return min_loan_sizes[currency]
+    return Decimal(min_loan_sizes[currency])
 
 
 def create_lend_offer(currency, amt, rate):
@@ -172,7 +172,7 @@ def get_min_daily_rate(cur):
         recommended_min = Analysis.get_rate_suggestion(cur)
         if cur_min_daily_rate < recommended_min:
             cur_min_daily_rate = recommended_min
-    return cur_min_daily_rate
+    return Decimal(cur_min_daily_rate)
 
 
 def construct_order_book(active_cur):
@@ -214,7 +214,7 @@ def get_cur_spread(spread, cur_active_bal, active_cur):
     cur_min_loan_size = get_min_loan_size(active_cur)
     while cur_active_bal < (cur_spread_lend * cur_min_loan_size):
         cur_spread_lend -= 1
-    return cur_spread_lend
+    return int(cur_spread_lend)
 
 
 def construct_orders(cur, cur_active_bal):
