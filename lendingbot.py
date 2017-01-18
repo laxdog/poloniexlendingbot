@@ -13,7 +13,7 @@ import modules.Data as Data
 import modules.Lending as Lending
 
 try:
-    open('default.cfg.example', 'r')
+    open('lendingbot.py', 'r')
 except IOError:
     os.chdir(os.path.dirname(sys.argv[0]))  # Allow relative paths
 
