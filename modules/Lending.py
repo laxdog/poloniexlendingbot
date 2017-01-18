@@ -166,7 +166,7 @@ def get_min_daily_rate(cur):
         if coin_cfg[cur]['maxactive'] == 0:
             log.log('maxactive amount for ' + cur + ' set to 0, won\'t lend.')
             return 0
-        cur_min_daily_rate = coin_cfg[cur]['minrate']
+        cur_min_daily_rate = Decimal(coin_cfg[cur]['minrate'])
         log.log('Using custom mindailyrate ' + str(coin_cfg[cur]['minrate'] * 100) + '% for ' + cur)
     if Analysis:
         recommended_min = Analysis.get_rate_suggestion(cur)
@@ -277,13 +277,13 @@ def lend_cur(active_cur, total_lended, lending_balances):
     orders = construct_orders(active_cur, active_bal)  # Construct all the potential orders
     i = 0
     while i < len(orders['amounts']):  # Iterate through prepped orders and create them if they work
-        below_min = orders['amounts'][i] < Decimal(cur_min_daily_rate)
+        below_min = Decimal(orders['amounts'][i]) < Decimal(cur_min_daily_rate)
 
         if hide_coins and below_min:
             log.log("Not lending " + active_cur + " due to low rate.")
             return 0
         elif below_min:
-            rate = min_daily_rate
+            rate = str(min_daily_rate)
         else:
             rate = orders['rates'][i]
 
