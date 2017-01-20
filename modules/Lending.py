@@ -43,7 +43,7 @@ def init(cfg, api1, log1, data, maxtolend, dry_run1, analysis):
     Analysis = analysis
 
     global sleep_time, sleep_time_active, sleep_time_inactive, min_daily_rate, max_daily_rate, spread_lend, \
-        gap_bottom, gap_top, xday_threshold, xdays, min_loan_size, end_date, coin_cfg, dry_run, \
+        gap_bottom, gap_top, xday_threshold, xdays, min_loan_size, end_date, coin_cfg, min_loan_sizes, dry_run, \
         transferable_currencies, keep_stuck_orders, hide_coins
 
     sleep_time_active = float(Config.get("BOT", "sleeptimeactive", None, 1, 3600))
@@ -58,6 +58,7 @@ def init(cfg, api1, log1, data, maxtolend, dry_run1, analysis):
     min_loan_size = Decimal(Config.get("BOT", 'minloansize', None, 0.01))
     end_date = Config.get('BOT', 'endDate')
     coin_cfg = Config.get_coin_cfg()
+    min_loan_sizes = Config.get_min_loan_sizes()
     dry_run = dry_run1
     transferable_currencies = Config.get_currencies_list('transferableCurrencies')
     keep_stuck_orders = Config.getboolean('BOT', "keepstuckorders", True)
