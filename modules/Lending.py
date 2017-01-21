@@ -278,7 +278,7 @@ def lend_cur(active_cur, total_lended, lending_balances):
     orders = construct_orders(active_cur, active_bal)  # Construct all the potential orders
     i = 0
     while i < len(orders['amounts']):  # Iterate through prepped orders and create them if they work
-        below_min = Decimal(orders['amounts'][i]) < Decimal(cur_min_daily_rate)
+        below_min = Decimal(orders['rates'][i]) < Decimal(cur_min_daily_rate)
 
         if hide_coins and below_min:
             log.log("Not lending " + active_cur + " due to low rate.")
