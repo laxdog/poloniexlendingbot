@@ -97,7 +97,7 @@ def update_conversion_rates(output_currency, json_output_enabled):
         if output_currency == 'BTC':
             log.updateOutputCurrency('highestBid', '1')
             log.updateOutputCurrency('currency', output_currency)
-        else:
+        elif output_currency != 'USDT':
             url = "https://blockchain.info/tobtc?currency={0}&value=1".format(output_currency)
             try:
                 highest_bid = json.loads(urlopen(url).read())
