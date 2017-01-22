@@ -11,6 +11,13 @@ var Coin_Val = 1.00000000;
 var Coin = "BTC";
 var effRateMode = 'lentperc';
 
+// BTC DisplayUnit
+var BTC = new BTCDisplayUnit("BTC", 1);
+var mBTC = new BTCDisplayUnit("mBTC", 1000);
+var uBTC = new BTCDisplayUnit("uBTC", 1000000);
+var Satoshi = new BTCDisplayUnit("Satoshi", 100000000);
+var displayUnit = BTC;
+
 function updateJson(data) {
     $('#status').text(data.last_status);
     $('#updated').text(data.last_update);
@@ -218,9 +225,22 @@ function Timespan(name, multiplier) {
             if (currency != "BTC" && currency != "USDT") {
                 currencyClass = 'hidden-xs';
             }
-            return printFloat(earnings, 8) + " <span class=" + currencyClass + ">" + currency + "</span> / "+  name + "<br/>";
+            if (currency == "BTC") {
+                return displayUnit.formatValue(earnings) + " " + displayUnit.name + " / " + name + "<br/>"
+            } else {
+                return printFloat(earnings, 8) + " <span class=" + currencyClass + ">" + currency + "</span> / "+  name + "<br/>";
+            }
         }
     };
+}
+
+function BTCDisplayUnit(name, multiplier) {
+    this.name = name;
+    this.multiplier = multiplier;
+    this.precision = Math.log10(multiplier);
+    this.formatValue = function(value) {
+        return printFloat(value * this.multiplier, 9 - this.precision);
+    }
 }
 
 function setEffRateMode() {
@@ -244,8 +264,32 @@ function setEffRateMode() {
     console.log('Effective rate mode: ' + effRateMode);
 }
 
+function setBTCDisplayUnit() {
+    var validModes = [BTC, mBTC, uBTC, Satoshi];
+    var q = location.search.match(/[\?&]displayUnit=[^&]+/);
+    var displayUnitText;
+
+    if (q) {
+        //console.log('Got displayUnitText from URI');
+        displayUnitText = q[0].split('=')[1];
+    } else {
+        if (localStorage.displayUnitText) {
+            //console.log('Got displayUnitText from localStorage');
+            displayUnitText = localStorage.displayUnitText;
+        }
+    }
+    validModes.forEach(function(unit) {
+        if(unit.name == displayUnitText) {
+            displayUnit = unit;
+            localStorage.displayUnitText = displayUnitText;
+        }
+    })
+    console.log('displayUnitText: ' + displayUnitText);
+}
+
 $(document).ready(function () {
     setEffRateMode();
+    setBTCDisplayUnit();
     loadData();
     if (window.location.protocol == "file:") {
         $('#file').show();
