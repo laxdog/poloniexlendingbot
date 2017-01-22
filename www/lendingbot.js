@@ -7,8 +7,8 @@ var Day = new Timespan("Day",1);
 var Week = new Timespan("Week",7);
 var Month = new Timespan("Month",30);
 var timespans = [Month, Week, Day, Hour];
-var Coin_Val = 1.00000000;
-var Coin = "BTC";
+var summeryCoinRate = 1.00000000;
+var summeryCoin = "BTC";
 var effRateMode = 'lentperc';
 
 // BTC DisplayUnit
@@ -35,9 +35,9 @@ function updateJson(data) {
 
 function updateOutputCurrency(outputCurrency){
     var OutCurr = Object.keys(outputCurrency);
-    Coin = outputCurrency['currency'];
-    if (Coin != "BTC") {
-        Coin_Val = parseFloat(outputCurrency['highestBid']);
+    summeryCoin = outputCurrency['currency'];
+    if (summeryCoin != "BTC") {
+        summeryCoinRate = 1/parseFloat(outputCurrency['highestBid']);
     }
 }
 
@@ -75,7 +75,7 @@ function updateRawValues(rawData){
 
                 // calculate coin earnings
                 timespanEarning = timespan.calcEarnings(lentSum, rate);
-                earnings += timespan.formatEarnings(currency, timespanEarning);
+                earnings += timespan.formatEarnings(currency, timespanEarning, true);
                 if (currency == 'BTC') {
                     totalBTCEarnings[timespan.name] += timespanEarning;
                 }
@@ -154,18 +154,10 @@ function updateRawValues(rawData){
     var thead = table.createTHead();
 
     // show account summary
-    if (currencies.length > 1) {
+    if (currencies.length > 1 || summeryCoin != "BTC") {
         earnings = '';
         timespans.forEach(function(timespan) {
-            if (Coin == "BTC") {
-                earnings += timespan.formatEarnings( Coin, totalBTCEarnings[timespan.name]);
-            }
-            if (Coin == "USDT") {
-                earnings += timespan.formatEarnings( Coin, totalBTCEarnings[timespan.name]*Coin_Val);
-            }
-            if (Coin != "BTC" && Coin != "USDT") {
-                earnings += timespan.formatEarnings( Coin, totalBTCEarnings[timespan.name]/Coin_Val);
-            }
+            earnings += timespan.formatEarnings( summeryCoin, totalBTCEarnings[timespan.name] * summeryCoinRate);
         });
         var row = thead.insertRow(0);
         var cell = row.appendChild(document.createElement("th"));
@@ -217,16 +209,16 @@ function Timespan(name, multiplier) {
     this.calcEarnings = function(sum, rate) {
         return sum * rate * this.multiplier;
     };
-    this.formatEarnings = function(currency, earnings) {
+    this.formatEarnings = function(currency, earnings, minimize_currency_xs) {
         if (currency == "BTC" && this == Hour) {
             return printFloat(earnings * 100000000, 0) + " Satoshi / " + name + "<br/>";
         } else {
             var currencyClass = '';
-            if (currency != "BTC" && currency != "USDT") {
+            if (minimize_currency_xs) {
                 currencyClass = 'hidden-xs';
             }
             if (currency == "BTC") {
-                return displayUnit.formatValue(earnings) + " " + displayUnit.name + " / " + name + "<br/>"
+                return displayUnit.formatValue(earnings) + " <span class=" + currencyClass + ">" + displayUnit.name + "</span> / " + name + "<br/>"
             } else {
                 return printFloat(earnings, 8) + " <span class=" + currencyClass + ">" + currency + "</span> / "+  name + "<br/>";
             }
@@ -239,7 +231,7 @@ function BTCDisplayUnit(name, multiplier) {
     this.multiplier = multiplier;
     this.precision = Math.log10(multiplier);
     this.formatValue = function(value) {
-        return printFloat(value * this.multiplier, 9 - this.precision);
+        return printFloat(value * this.multiplier, 8 - this.precision);
     }
 }
 
