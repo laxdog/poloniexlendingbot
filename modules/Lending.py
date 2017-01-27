@@ -27,6 +27,8 @@ dry_run = 0
 transferable_currencies = []
 keep_stuck_orders = True
 hide_coins = True
+coin_cfg_alerted = {}
+max_active_alerted = {}
 
 # limit of orders to request
 loanOrdersRequestLimit = {}
@@ -153,11 +155,11 @@ def lend_all():
             MaxToLend.amount_to_lend(total_lended[key], key, 0, 0)
     usable_currencies = 0
     global sleep_time  # We need global var to edit sleeptime
-    for cur in lending_balances:
-        try:
+    try:
+        for cur in lending_balances:
             usable_currencies += lend_cur(cur, total_lended, lending_balances)
-        except StopIteration:  # Restart lending if we stop to raise the request limit.
-            lend_all()
+    except StopIteration:  # Restart lending if we stop to raise the request limit.
+        lend_all()
     set_sleep_time(usable_currencies)
 
 
@@ -165,10 +167,14 @@ def get_min_daily_rate(cur):
     cur_min_daily_rate = min_daily_rate
     if cur in coin_cfg:
         if coin_cfg[cur]['maxactive'] == 0:
-            log.log('maxactive amount for ' + cur + ' set to 0, won\'t lend.')
-            return 0
+            if cur not in max_active_alerted:  # Only alert once per coin.
+                max_active_alerted[cur] = True
+                log.log('maxactive amount for ' + cur + ' set to 0, won\'t lend.')
+            return False
         cur_min_daily_rate = Decimal(coin_cfg[cur]['minrate'])
-        log.log('Using custom mindailyrate ' + str(coin_cfg[cur]['minrate'] * 100) + '% for ' + cur)
+        if cur not in coin_cfg_alerted:  # Only alert once per coin.
+            coin_cfg_alerted[cur] = True
+            log.log('Using custom mindailyrate ' + str(coin_cfg[cur]['minrate'] * 100) + '% for ' + cur)
     if Analysis:
         recommended_min = Analysis.get_rate_suggestion(cur)
         if cur_min_daily_rate < recommended_min:
@@ -264,7 +270,7 @@ def lend_cur(active_cur, total_lended, lending_balances):
     # log total coin
     log.updateStatusValue(active_cur, "totalCoins", (Decimal(active_cur_total_balance)))
     order_book = construct_order_book(active_cur)
-    if not order_book or len(order_book['rates']) == 0:
+    if not order_book or len(order_book['rates']) == 0 or not cur_min_daily_rate:
         return 0
 
     active_bal = MaxToLend.amount_to_lend(active_cur_total_balance, active_cur, Decimal(lending_balances[active_cur]),
