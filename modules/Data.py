@@ -89,7 +89,7 @@ def update_conversion_rates(output_currency, json_output_enabled):
                 log.updateStatusValue(currency, 'highestBid', ticker_response[couple]['highestBid'])
                 log.updateStatusValue(currency, 'couple', couple)
             if output_currency == 'USDT' and ref == 'USDT' and currency == 'BTC':
-                log.updateOutputCurrency('highestBid', ticker_response[couple]['highestBid'])
+                log.updateOutputCurrency('highestBid', 1 / ticker_response[couple]['highestBid'])
                 log.updateOutputCurrency('currency', output_currency)
             if output_currency != 'USDT' and ref == 'BTC' and currency == output_currency:
                 log.updateOutputCurrency('highestBid', ticker_response[couple]['highestBid'])
