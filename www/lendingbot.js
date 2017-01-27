@@ -7,8 +7,7 @@ var Day = new Timespan("Day",1);
 var Week = new Timespan("Week",7);
 var Month = new Timespan("Month",30);
 var timespans = [Month, Week, Day, Hour];
-var summaryCoinRate = 1.00000000;
-var summaryCoin = "BTC";
+var summaryCoinRate, summaryCoin;
 var effRateMode = 'lentperc';
 
 // BTC DisplayUnit
@@ -36,9 +35,7 @@ function updateJson(data) {
 function updateOutputCurrency(outputCurrency){
     var OutCurr = Object.keys(outputCurrency);
     summaryCoin = outputCurrency['currency'];
-    if (summaryCoin != "BTC") {
-        summaryCoinRate = 1/parseFloat(outputCurrency['highestBid']);
-    }
+    summaryCoinRate = parseFloat(outputCurrency['highestBid']);
 }
 
 function updateRawValues(rawData){
