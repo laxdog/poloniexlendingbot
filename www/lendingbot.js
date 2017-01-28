@@ -13,7 +13,7 @@ var effRateMode = 'lentperc';
 // BTC DisplayUnit
 var BTC = new BTCDisplayUnit("BTC", 1);
 var mBTC = new BTCDisplayUnit("mBTC", 1000);
-var uBTC = new BTCDisplayUnit("uBTC", 1000000);
+var Bits = new BTCDisplayUnit("Bits", 1000000);
 var Satoshi = new BTCDisplayUnit("Satoshi", 100000000);
 var displayUnit = BTC;
 
@@ -254,7 +254,7 @@ function setEffRateMode() {
 }
 
 function setBTCDisplayUnit() {
-    var validModes = [BTC, mBTC, uBTC, Satoshi];
+    var validModes = [BTC, mBTC, Bits, Satoshi];
     var q = location.search.match(/[\?&]displayUnit=[^&]+/);
     var displayUnitText;
 

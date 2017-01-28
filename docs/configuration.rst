@@ -306,5 +306,5 @@ You can pass options to statistics page by adding them to URL. Eg, ``http://loca
 - ``onlyfee`` calculates effective rate without considering coin lent percentage.
 
 ``displayUnit`` controls BTC unit output
-- Allowed values: ``BTC``, ``mBTC``, ``uBTC``, ``Satoshi``.
+- Allowed values: ``BTC``, ``mBTC``, ``Bits``, ``Satoshi``.
 - Default value: ``BTC``.
