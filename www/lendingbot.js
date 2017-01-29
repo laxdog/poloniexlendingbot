@@ -43,6 +43,7 @@ function updateRawValues(rawData){
     table.innerHTML = "";
     var currencies = Object.keys(rawData);
     var totalBTCEarnings = {};
+    var btcMultiplier = currency == 'BTC' ? displayUnit.multiplier : 1;
     for (var keyIndex = 0; keyIndex < currencies.length; ++keyIndex)
     {
         var currency = currencies[keyIndex];
@@ -108,16 +109,15 @@ function updateRawValues(rawData){
             else
                 effRateText = makeTooltip("Effective loan rate, considering poloniex 15% fee.", "Eff.");
             var compoundRateText = makeTooltip("Compound yearly rate, the result of reinvesting the interest.", "Comp.");
-            var multiplier = currency == 'BTC' ? displayUnit.multiplier : 1;
-            var lentStr = 'Lent ' + printFloat(lentSum * multiplier, 4) +' of ' + printFloat(totalCoins * multiplier, 4) + ' (' + printFloat(lentPerc, 2) + '%)';
+            var lentStr = 'Lent ' + printFloat(lentSum * btcMultiplier, 4) +' of ' + printFloat(totalCoins * btcMultiplier, 4) + ' (' + printFloat(lentPerc, 2) + '%)';
 
             if (totalCoins != maxToLend) {
-                lentStr += ' <b>Total</b><br/>Lent ' + printFloat(lentSum * multiplier, 4) + ' of ' + printFloat(maxToLend * multiplier, 4) + ' (' + printFloat(lentPercLendable, 2) + '%) <b>Lendable</b>';
+                lentStr += ' <b>Total</b><br/>Lent ' + printFloat(lentSum * btcMultiplier, 4) + ' of ' + printFloat(maxToLend * btcMultiplier, 4) + ' (' + printFloat(lentPercLendable, 2) + '%) <b>Lendable</b>';
             }
 
             var displayCurrency = currency == 'BTC' ? displayUnit.name : currency;
             var currencyStr = "<b>" + displayCurrency + "</b>";
-            currencyStr += "<br/>1 "+ displayCurrency + " = " + printFloat(summaryCoinRate * highestBidBTC / multiplier , 4) + ' ' + summaryCoin;
+            currencyStr += "<br/>1 "+ displayCurrency + " = " + printFloat(summaryCoinRate * highestBidBTC / btcMultiplier , 4) + ' ' + summaryCoin;
             var rowValues = [currencyStr, lentStr,
                 "<div class='inlinediv' >" + printFloat(averageLendingRate, 5) + '% Day' + avgRateText + '<br/>'
                     + printFloat(effectiveRate, 5) + '% Day' + effRateText + '<br/></div>'
