@@ -117,7 +117,9 @@ function updateRawValues(rawData){
 
             var displayCurrency = currency == 'BTC' ? displayUnit.name : currency;
             var currencyStr = "<b>" + displayCurrency + "</b>";
-            currencyStr += "<br/>1 "+ displayCurrency + " = " + printFloat(summaryCoinRate * highestBidBTC / btcMultiplier , 4) + ' ' + summaryCoin;
+            if(!isNaN(highestBidBTC)) {
+                currencyStr += "<br/>1 "+ displayCurrency + " = " + printFloat(summaryCoinRate * highestBidBTC / btcMultiplier , 4) + ' ' + summaryCoin;
+            }
             var rowValues = [currencyStr, lentStr,
                 "<div class='inlinediv' >" + printFloat(averageLendingRate, 5) + '% Day' + avgRateText + '<br/>'
                     + printFloat(effectiveRate, 5) + '% Day' + effRateText + '<br/></div>'
