@@ -153,7 +153,7 @@ function updateRawValues(rawData){
     var thead = table.createTHead();
 
     // show account summary
-    if (currencies.length > 1) {
+    if (currencies.length > 1 || summaryCoin != "BTC") {
         earnings = '';
         timespans.forEach(function(timespan) {
             earnings += timespan.formatEarnings( summaryCoin, totalBTCEarnings[timespan.name] * summaryCoinRate);
