@@ -63,7 +63,7 @@ function updateRawValues(rawData){
             var rate = +averageLendingRate  * 0.85 / 100; // 15% goes to Poloniex fees
 
             var earnings = '';
-            var earningsBTC = '';
+            var earningsSummaryCoin = '';
             timespans.forEach(function(timespan) {
                 // init totalBTCEarnings
                 if (isNaN(totalBTCEarnings[timespan.name])) {
@@ -75,10 +75,11 @@ function updateRawValues(rawData){
                 earnings += timespan.formatEarnings(currency, timespanEarning, true);
                 if (currency == 'BTC') {
                     totalBTCEarnings[timespan.name] += timespanEarning;
+                    highestBidBTC = 1;
                 } else if (!isNaN(highestBidBTC)) {
-                    // calculate BTC earnings
+                    // calculate BTC earnings for other coins
                     timespanEarningBTC = timespan.calcEarnings(lentSum * highestBidBTC, rate);
-                    earningsBTC += timespan.formatEarnings("BTC", timespanEarningBTC);
+                    earningsSummaryCoin += timespan.formatEarnings(summaryCoin, timespanEarningBTC * summaryCoinRate);
                     totalBTCEarnings[timespan.name] += timespanEarningBTC;
                 }
             });
@@ -111,8 +112,9 @@ function updateRawValues(rawData){
             }
 
             var displayCurrency = currency == 'BTC' ? displayUnit.name : currency;
-
-            var rowValues = ["<b>" + displayCurrency + "</b>", lentStr,
+            var currencyStr = "<b>" + displayCurrency + "</b>";
+            currencyStr += "<br/>1 "+ displayCurrency + " = " + printFloat(summaryCoinRate * highestBidBTC / multiplier , 4) + ' ' + summaryCoin;
+            var rowValues = [currencyStr, lentStr,
                 "<div class='inlinediv' >" + printFloat(averageLendingRate, 5) + '% Day' + avgRateText + '<br/>'
                     + printFloat(effectiveRate, 5) + '% Day' + effRateText + '<br/></div>'
                     + "<div class='inlinediv' >" + printFloat(yearlyRate, 2) + '% Year<br/>'
@@ -139,8 +141,7 @@ function updateRawValues(rawData){
                 var cell2 = row.appendChild(document.createElement("td"));
                 cell2.setAttribute("colspan", earningsColspan);
                 if (!isNaN(highestBidBTC)) {
-                    cell1.innerHTML += "<br/><span class='hidden-xs'><br/>" + couple +"</span> highest bid: "+ printFloat(highestBidBTC, 8);
-                    cell2.innerHTML = "<div class='inlinediv' >" + earnings + "<br/></div><div class='inlinediv' style='padding-right:0px'>"+ earningsBTC + "</div>";
+                    cell2.innerHTML = "<div class='inlinediv' >" + earnings + "<br/></div><div class='inlinediv' style='padding-right:0px'>"+ earningsSummaryCoin + "</div>";
                 } else {
                     cell2.innerHTML = "<div class='inlinediv' >" +earnings + "</div>";
                 }
@@ -152,7 +153,7 @@ function updateRawValues(rawData){
     var thead = table.createTHead();
 
     // show account summary
-    if (currencies.length > 1 || summaryCoin != "BTC") {
+    if (currencies.length > 1) {
         earnings = '';
         timespans.forEach(function(timespan) {
             earnings += timespan.formatEarnings( summaryCoin, totalBTCEarnings[timespan.name] * summaryCoinRate);
