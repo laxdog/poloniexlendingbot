@@ -51,6 +51,11 @@ function updateRawValues(rawData){
         var totalCoins = parseFloat(rawData[currency]['totalCoins']);
         var maxToLend = parseFloat(rawData[currency]['maxToLend']);
         var highestBidBTC = parseFloat(rawData[currency]['highestBid']);
+        if (currency == 'BTC') {
+            // no bids for BTC provided by poloniex
+            // this is added so BTC can be handled like other coins for conversions
+            highestBidBTC = 1;
+        }
         var couple = rawData[currency]['couple'];
 
         if (!isNaN(averageLendingRate) && !isNaN(lentSum) || !isNaN(totalCoins))
@@ -73,14 +78,13 @@ function updateRawValues(rawData){
                 // calculate coin earnings
                 timespanEarning = timespan.calcEarnings(lentSum, rate);
                 earnings += timespan.formatEarnings(currency, timespanEarning, true);
-                if (currency == 'BTC') {
-                    totalBTCEarnings[timespan.name] += timespanEarning;
-                    highestBidBTC = 1;
-                } else if (!isNaN(highestBidBTC)) {
-                    // calculate BTC earnings for other coins
-                    timespanEarningBTC = timespan.calcEarnings(lentSum * highestBidBTC, rate);
+
+                // sum BTC earnings for all coins
+                timespanEarningBTC = timespan.calcEarnings(lentSum * highestBidBTC, rate);
+                totalBTCEarnings[timespan.name] += timespanEarningBTC;
+
+                if(currency != summaryCoin) {
                     earningsSummaryCoin += timespan.formatEarnings(summaryCoin, timespanEarningBTC * summaryCoinRate);
-                    totalBTCEarnings[timespan.name] += timespanEarningBTC;
                 }
             });
 
@@ -140,10 +144,10 @@ function updateRawValues(rawData){
                 cell1.innerHTML = "<span class='hidden-xs'>"+ displayCurrency +"<br/></span>Estimated<br/>Earnings";
                 var cell2 = row.appendChild(document.createElement("td"));
                 cell2.setAttribute("colspan", earningsColspan);
-                if (!isNaN(highestBidBTC)) {
+                if (earningsSummaryCoin != '') {
                     cell2.innerHTML = "<div class='inlinediv' >" + earnings + "<br/></div><div class='inlinediv' style='padding-right:0px'>"+ earningsSummaryCoin + "</div>";
                 } else {
-                    cell2.innerHTML = "<div class='inlinediv' >" +earnings + "</div>";
+                    cell2.innerHTML = "<div class='inlinediv' >" + earnings + "</div>";
                 }
             }
         }
@@ -153,7 +157,7 @@ function updateRawValues(rawData){
     var thead = table.createTHead();
 
     // show account summary
-    if (currencies.length > 1 || summaryCoin != "BTC") {
+    if (currencies.length > 1) {
         earnings = '';
         timespans.forEach(function(timespan) {
             earnings += timespan.formatEarnings( summaryCoin, totalBTCEarnings[timespan.name] * summaryCoinRate);
