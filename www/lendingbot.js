@@ -75,10 +75,8 @@ function updateRawValues(rawData){
                 earnings += timespan.formatEarnings(currency, timespanEarning, true);
                 if (currency == 'BTC') {
                     totalBTCEarnings[timespan.name] += timespanEarning;
-                }
-
-                // calculate BTC earnings
-                if (!isNaN(highestBidBTC) && !(currency == 'BTC')) {
+                } else if (!isNaN(highestBidBTC)) {
+                    // calculate BTC earnings
                     timespanEarningBTC = timespan.calcEarnings(lentSum * highestBidBTC, rate);
                     earningsBTC += timespan.formatEarnings("BTC", timespanEarningBTC);
                     totalBTCEarnings[timespan.name] += timespanEarningBTC;
@@ -105,13 +103,16 @@ function updateRawValues(rawData){
             else
                 effRateText = makeTooltip("Effective loan rate, considering poloniex 15% fee.", "Eff.");
             var compoundRateText = makeTooltip("Compound yearly rate, the result of reinvesting the interest.", "Comp.");
-            var lentStr = 'Lent ' + printFloat(lentSum, 4) +' of ' + printFloat(totalCoins, 4) + ' (' + printFloat(lentPerc, 2) + '%)';
+            var multiplier = currency == 'BTC' ? displayUnit.multiplier : 1;
+            var lentStr = 'Lent ' + printFloat(lentSum * multiplier, 4) +' of ' + printFloat(totalCoins * multiplier, 4) + ' (' + printFloat(lentPerc, 2) + '%)';
 
             if (totalCoins != maxToLend) {
-                lentStr += ' <b>Total</b><br/>Lent ' + printFloat(lentSum, 4) + ' of ' + printFloat(maxToLend, 4) + ' (' + printFloat(lentPercLendable, 2) + '%) <b>Lendable</b>';
+                lentStr += ' <b>Total</b><br/>Lent ' + printFloat(lentSum * multiplier, 4) + ' of ' + printFloat(maxToLend * multiplier, 4) + ' (' + printFloat(lentPercLendable, 2) + '%) <b>Lendable</b>';
             }
 
-            var rowValues = ["<b>" + currency + "</b>", lentStr,
+            var displayCurrency = currency == 'BTC' ? displayUnit.name : currency;
+
+            var rowValues = ["<b>" + displayCurrency + "</b>", lentStr,
                 "<div class='inlinediv' >" + printFloat(averageLendingRate, 5) + '% Day' + avgRateText + '<br/>'
                     + printFloat(effectiveRate, 5) + '% Day' + effRateText + '<br/></div>'
                     + "<div class='inlinediv' >" + printFloat(yearlyRate, 2) + '% Year<br/>'
@@ -134,7 +135,7 @@ function updateRawValues(rawData){
             var row = table.insertRow();
             if (lentSum > 0) {
                 var cell1 = row.appendChild(document.createElement("td"));
-                cell1.innerHTML = "<span class='hidden-xs'>"+ currency +"<br/></span>Estimated<br/>Earnings";
+                cell1.innerHTML = "<span class='hidden-xs'>"+ displayCurrency +"<br/></span>Estimated<br/>Earnings";
                 var cell2 = row.appendChild(document.createElement("td"));
                 cell2.setAttribute("colspan", earningsColspan);
                 if (!isNaN(highestBidBTC)) {
