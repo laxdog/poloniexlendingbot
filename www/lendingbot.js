@@ -81,12 +81,14 @@ function updateRawValues(rawData){
                 earnings += timespan.formatEarnings(currency, timespanEarning, true);
 
                 // sum BTC earnings for all coins
-                timespanEarningBTC = timespan.calcEarnings(lentSum * highestBidBTC, rate);
-                totalBTCEarnings[timespan.name] += timespanEarningBTC;
-
-                if(currency != summaryCoin) {
-                    earningsSummaryCoin += timespan.formatEarnings(summaryCoin, timespanEarningBTC * summaryCoinRate);
+                if(!isNaN(highestBidBTC)) {
+                    timespanEarningBTC = timespan.calcEarnings(lentSum * highestBidBTC, rate);
+                    totalBTCEarnings[timespan.name] += timespanEarningBTC;
+                    if(currency != summaryCoin) {
+                        earningsSummaryCoin += timespan.formatEarnings(summaryCoin, timespanEarningBTC * summaryCoinRate);
+                    }
                 }
+
             });
 
 
