@@ -38,6 +38,24 @@ function updateOutputCurrency(outputCurrency){
     summaryCoinRate = parseFloat(outputCurrency['highestBid']);
 }
 
+// prints a pretty float with accuracy.
+// above zero accuracy will be used for float precision
+// below zero accuracy will indicate precision after must significat digit
+// strips trailing zeros
+function prettyFloat(value, accuracy) {
+    var precision = Math.round(Math.log10(value));
+    precision = precision < 0 ? Math.abs(precision) + accuracy : accuracy;
+    var multiplier = Math.pow(10, precision);
+    var result = Math.round(value * multiplier) / multiplier;
+    return isNaN(result) ? "0" : parseFloat(result.toFixed(precision));
+}
+
+function printFloat(value, precision) {
+    var multiplier = Math.pow(10, precision);
+    var result = Math.round(value * multiplier) / multiplier;
+    return result = isNaN(result) ? "0" : result.toFixed(precision);
+}
+
 function updateRawValues(rawData){
     var table = document.getElementById("detailsTable");
     table.innerHTML = "";
@@ -120,7 +138,7 @@ function updateRawValues(rawData){
             var displayCurrency = currency == 'BTC' ? displayUnit.name : currency;
             var currencyStr = "<b>" + displayCurrency + "</b>";
             if(!isNaN(highestBidBTC)) {
-                currencyStr += "<br/>1 "+ displayCurrency + " = " + printFloat(summaryCoinRate * highestBidBTC / btcMultiplier , 4) + ' ' + summaryCoin;
+                currencyStr += "<br/>1 "+ displayCurrency + " = " + prettyFloat(summaryCoinRate * highestBidBTC / btcMultiplier , 2) + ' ' + summaryCoin;
             }
             var rowValues = [currencyStr, lentStr,
                 "<div class='inlinediv' >" + printFloat(averageLendingRate, 5) + '% Day' + avgRateText + '<br/>'
@@ -202,12 +220,6 @@ function loadData() {
             setTimeout('loadData()',60000)
         });;
     }
-}
-
-function printFloat(value, precision) {
-    var multiplier = Math.pow(10, precision);
-    var result = Math.round(value * multiplier) / multiplier;
-    return result = isNaN(result) ? "0" : result.toFixed(precision);
 }
 
 function Timespan(name, multiplier) {
