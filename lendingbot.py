@@ -4,6 +4,7 @@ import os
 import sys
 import time
 import traceback
+from httplib import BadStatusLine
 
 from decimal import Decimal
 
@@ -77,6 +78,8 @@ try:
         except KeyboardInterrupt:
             # allow existing the main bot loop
             raise
+        except BadStatusLine:
+            log.log_error("Caught BadStatusLine exception from Poloniex, ignoring.")
         except Exception as ex:
             log.log_error(ex.message)
             log.persistStatus()
