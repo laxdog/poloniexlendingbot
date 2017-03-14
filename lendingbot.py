@@ -5,6 +5,7 @@ import sys
 import time
 import traceback
 from httplib import BadStatusLine
+from urllib2 import HTTPError
 
 from decimal import Decimal
 
@@ -98,7 +99,7 @@ try:
             elif isinstance(ex, BadStatusLine):
                 print "Caught BadStatusLine exception from Poloniex, ignoring."
             # Ignore all 5xx errors (server error) as we can't do anything about it (https://httpstatuses.com/)
-            elif 'HTTP Error 5' in ex.message:
+            elif isinstance(ex, HTTPError):
                 print "Caught {0} from Poloniex, ignoring.".format(ex.message)
             else:
                 print traceback.format_exc()
