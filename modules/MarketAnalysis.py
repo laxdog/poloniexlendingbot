@@ -1,12 +1,13 @@
 import csv
 import threading
 import time
+import traceback
 import datetime
 from cStringIO import StringIO
 
 # Bot libs
 from modules.Configuration import FULL_LIST
-from modules.Data import timestamp, truncate
+from modules.Data import truncate
 try:
     import numpy
     use_numpy = True
@@ -17,11 +18,12 @@ except ImportError as ex:
     use_numpy = False
 
 # TODO
-# [  ] Thread the market data writing
-# [  ] Write to sqllite (people can use other DBs then if they like)
-# [  ] Reduce the time in the config file to allow 1 sec
-# [  ] Record more data (we can work out what to do with it later)
-# [  ] Provide something that takes into account dust offers. (The golden cross works well on BTC, not slower markets)
+# [x] Thread the market data writing
+# [x] Make write times more deterministic
+# [ ] Write to sqllite (people can use other DBs then if they like)
+# [ ] Reduce the time in the config file to allow 1 sec
+# [ ] Record more data (we can work out what to do with it later)
+# [ ] Provide something that takes into account dust offers. (The golden cross works well on BTC, not slower markets)
 
 # NOTES
 # * A possible solution for the dust problem is take the top 10 offers and if the offer amount is less than X% of the
@@ -52,29 +54,29 @@ class MarketAnalysis(object):
                     self.open_files[currency] = path
 
     def run(self):
-        for cur in self.open_files:
-            thread = threading.Thread(target=self.update_market_loop, args=(cur,))
-            thread.deamon = True
-            thread.start()
+        while True:
+            for cur in self.open_files:
+                thread = threading.Thread(target=self.update_market_loop, args=(cur,))
+                thread.deamon = True
+                thread.start()
+            # TODO Set this back to the config value
+            time.sleep(1)
 
     def update_market_loop(self, cur):
-        while True:
-            try:
-                self.update_market(cur)
-                # self.delete_old_data(cur)
-            except Exception as ex:
-                import traceback
-                ex.message = ex.message if ex.message else str(ex)
-                print("Error in MarketAnalysis: {0}".format(ex.message))
-                traceback.print_exc()
-            time.sleep(1)
+        try:
+            self.update_market(cur)
+            # self.delete_old_data(cur)
+        except Exception as ex:
+            ex.message = ex.message if ex.message else str(ex)
+            print("Error in MarketAnalysis: {0}".format(ex.message))
+            traceback.print_exc()
 
     def update_market(self, cur):
         with open(self.open_files[cur], 'a') as f:
             writer = csv.writer(f, lineterminator='\n')
             length = 10
             raw_data = self.api.return_loan_orders(cur, length)['offers']
-            market_data = [timestamp()]
+            market_data = [time.time()]
             for i in xrange(length):
                 market_data.extend([raw_data[i]['rate']])
                 market_data.extend([raw_data[i]['amount']])
