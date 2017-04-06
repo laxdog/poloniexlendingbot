@@ -61,17 +61,23 @@ class MarketAnalysis(object):
         while True:
             try:
                 self.update_market(cur)
-                self.delete_old_data(cur)
+                # self.delete_old_data(cur)
             except Exception as ex:
+                import traceback
                 ex.message = ex.message if ex.message else str(ex)
                 print("Error in MarketAnalysis: {0}".format(ex.message))
-            time.sleep(self.update_interval)
+                traceback.print_exc()
+            time.sleep(1)
 
     def update_market(self, cur):
         with open(self.open_files[cur], 'a') as f:
             writer = csv.writer(f, lineterminator='\n')
-            raw_data = self.api.return_loan_orders(cur, 5)['offers'][0]
-            market_data = [timestamp(), raw_data['rate']]
+            length = 10
+            raw_data = self.api.return_loan_orders(cur, length)['offers']
+            market_data = [timestamp()]
+            for i in xrange(length):
+                market_data.extend([raw_data[i]['rate']])
+                market_data.extend([raw_data[i]['amount']])
             writer.writerow(market_data)
 
     def delete_old_data(self, cur):
