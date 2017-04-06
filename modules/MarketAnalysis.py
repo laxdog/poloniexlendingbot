@@ -16,6 +16,17 @@ except ImportError as ex:
           "It is recommended to install Numpy. Error: {0}".format(ex.message))
     use_numpy = False
 
+# TODO
+# [  ] Thread the market data writing
+# [  ] Write to sqllite (people can use other DBs then if they like)
+# [  ] Reduce the time in the config file to allow 1 sec
+# [  ] Record more data (we can work out what to do with it later)
+# [  ] Provide something that takes into account dust offers. (The golden cross works well on BTC, not slower markets)
+
+# NOTES
+# * A possible solution for the dust problem is take the top 10 offers and if the offer amount is less than X% of the
+#   total available, ignore it as dust.
+
 
 class MarketAnalysis(object):
     def __init__(self, config, api):
@@ -41,41 +52,40 @@ class MarketAnalysis(object):
                     self.open_files[currency] = path
 
     def run(self):
-        thread = threading.Thread(target=self.update_market_loop)
-        thread.deamon = True
-        thread.start()
+        for cur in self.open_files:
+            thread = threading.Thread(target=self.update_market_loop, args=(cur,))
+            thread.deamon = True
+            thread.start()
 
-    def update_market_loop(self):
+    def update_market_loop(self, cur):
         while True:
             try:
-                self.update_markets()
-                self.delete_old_data()
+                self.update_market(cur)
+                self.delete_old_data(cur)
             except Exception as ex:
                 ex.message = ex.message if ex.message else str(ex)
                 print("Error in MarketAnalysis: {0}".format(ex.message))
             time.sleep(self.update_interval)
 
-    def update_markets(self):
-        for cur in self.open_files:
-            with open(self.open_files[cur], 'a') as f:
-                writer = csv.writer(f, lineterminator='\n')
-                raw_data = self.api.return_loan_orders(cur, 5)['offers'][0]
-                market_data = [timestamp(), raw_data['rate']]
-                writer.writerow(market_data)
+    def update_market(self, cur):
+        with open(self.open_files[cur], 'a') as f:
+            writer = csv.writer(f, lineterminator='\n')
+            raw_data = self.api.return_loan_orders(cur, 5)['offers'][0]
+            market_data = [timestamp(), raw_data['rate']]
+            writer.writerow(market_data)
 
-    def delete_old_data(self):
-        for cur in self.open_files:
-            with open(self.open_files[cur], 'rb') as file_a:
-                new_a_buf = StringIO()
-                writer = csv.writer(new_a_buf)
-                reader2 = csv.reader(file_a)
-                for row in reader2:
-                    if self.get_day_difference(row[0]) < self.max_age:
-                        writer.writerow(row)
+    def delete_old_data(self, cur):
+        with open(self.open_files[cur], 'rb') as file_a:
+            new_a_buf = StringIO()
+            writer = csv.writer(new_a_buf)
+            reader2 = csv.reader(file_a)
+            for row in reader2:
+                if self.get_day_difference(row[0]) < self.max_age:
+                    writer.writerow(row)
 
-            # At this point, the contents (new_a_buf) exist in memory
-            with open(self.open_files[cur], 'wb') as file_b:
-                file_b.write(new_a_buf.getvalue())
+        # At this point, the contents (new_a_buf) exist in memory
+        with open(self.open_files[cur], 'wb') as file_b:
+            file_b.write(new_a_buf.getvalue())
 
     @staticmethod
     def get_day_difference(date_time):  # Will be in format '%Y-%m-%d %H:%M:%S'
