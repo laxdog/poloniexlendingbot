@@ -89,13 +89,13 @@ def get_file_len(filename):
     return i + 1
 
 
-def test_update_markets():
+def test_update_market():
     add_test_files_to_MA_obj(MA)
     file_lens = {}
     for cur in FULL_LIST:
         file_lens[cur] = get_file_len(MA.open_files[cur])
-    MA.update_markets()
     for cur in FULL_LIST:
+        MA.update_market(cur)
         assert(file_lens[cur] + 1 == get_file_len(MA.open_files[cur]))
 
 
@@ -104,8 +104,8 @@ def test_update_markets():
 def test_delete_old_data(max_age):
     add_test_files_to_MA_obj(MA)
     MA.max_age = max_age
-    MA.delete_old_data()
-    for rate_file in MA.open_files.values():
+    for cur, rate_file in MA.open_files.items():
+        MA.delete_old_data(cur)
         with open(rate_file) as f:
             reader = csv.reader(f)
             for row in reader:

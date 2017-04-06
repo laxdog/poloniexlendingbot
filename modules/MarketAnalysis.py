@@ -70,7 +70,7 @@ class MarketAnalysis(object):
     def update_market_loop(self, cur):
         try:
             self.update_market(cur)
-            # self.delete_old_data(cur)
+            self.delete_old_data(cur)
         except Exception as ex:
             ex.message = ex.message if ex.message else str(ex)
             print("Error in MarketAnalysis: {0}".format(ex.message))
