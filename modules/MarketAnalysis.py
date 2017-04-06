@@ -54,10 +54,15 @@ class MarketAnalysis(object):
                     self.open_files[currency] = path
 
     def run(self):
+        thread = threading.Thread(target=self.run_threads)
+        thread.deamon = True
+        thread.start()
+
+    def run_threads(self):
         while True:
             for cur in self.open_files:
                 thread = threading.Thread(target=self.update_market_loop, args=(cur,))
-                thread.deamon = True
+                thread.deamon = False
                 thread.start()
             # TODO Set this back to the config value
             time.sleep(1)
