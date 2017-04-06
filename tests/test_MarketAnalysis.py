@@ -4,6 +4,7 @@ from hypothesis.extra.datetime import datetimes
 
 import csv
 import datetime
+from pytz import timezone
 import tempfile
 
 # Hack to get relative imports - probably need to fix the dir structure instead but we need this at the minute for
@@ -25,13 +26,6 @@ Data.init(api, None)
 MA = MarketAnalysis(Config, api)
 
 
-# Contrived example for hypothesis
-@given(datetimes(min_year=1900))
-def test_get_day_difference(date_time):
-    diff = MA.get_day_difference(date_time.strftime("%Y-%m-%d %H:%M:%S"))
-    assert diff == (datetime.datetime.now() - date_time.replace(tzinfo=None)).days
-
-
 def create_dummy_rate_file(rate_file):
     rates = lists(floats(min_value=0.00001, allow_nan=False, allow_infinity=False), min_size=0, max_size=100).example()
     max_year = datetime.datetime.now().year
@@ -40,7 +34,7 @@ def create_dummy_rate_file(rate_file):
     with open(rate_file, 'a') as f:
         for date_time, rate in zip(date_times, rates):
             writer = csv.writer(f, lineterminator='\n')
-            market_data = [date_time.strftime("%Y-%m-%d %H:%M:%S"), rate]
+            market_data = [float(date_time.strftime("%s")), rate]
             writer.writerow(market_data)
     return rates, date_times
 
