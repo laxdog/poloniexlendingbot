@@ -1,8 +1,10 @@
 import csv
+import sys
 import threading
 import time
 import traceback
 import datetime
+import pandas as pd
 from cStringIO import StringIO
 
 # Bot libs
@@ -24,6 +26,7 @@ except ImportError as ex:
 # [ ] Reduce the time in the config file to allow 1 sec
 # [ ] Record more data (we can work out what to do with it later)
 # [ ] Provide something that takes into account dust offers. (The golden cross works well on BTC, not slower markets)
+# [ ] RE: above. Weighted rate.
 
 # NOTES
 # * A possible solution for the dust problem is take the top 10 offers and if the offer amount is less than X% of the
@@ -101,8 +104,8 @@ class MarketAnalysis(object):
             file_b.write(new_a_buf.getvalue())
 
     @staticmethod
-    def get_day_difference(date_time):  # Will be in format '%Y-%m-%d %H:%M:%S'
-        date1 = datetime.datetime.strptime(date_time, '%Y-%m-%d %H:%M:%S')
+    def get_day_difference(date_time):  # Will be a number of seconds since epoch
+        date1 = datetime.datetime.fromtimestamp(float(date_time))
         now = datetime.datetime.now()
         diff_days = (now - date1).days
         return diff_days
@@ -131,7 +134,10 @@ class MarketAnalysis(object):
             if method == 'percentile':
                 return self.get_percentile(rates, self.lending_style)
             elif method == 'golden_cross':
-                raise ValueError("{0} not yet implmented")
+                rate = truncate(self.get_golden_cross_rate(cur), 6)
+                print("Cur: {0}, Golden : {1}, Percent {2}, Best: {3}"
+                      .format(cur, rate, self.get_percentile(rates, self.lending_style), rates[-1]))
+                return rate
             else:
                 raise ValueError("{0} strategy not recognised")
 
@@ -171,3 +177,18 @@ class MarketAnalysis(object):
             result = self.percentile(sorted(rates), lending_style / 100.0)
         result = truncate(result, 6)
         return result
+
+    def get_golden_cross_rate(self, cur, short_period=150, long_period=1800):
+        rates = self.get_rate_list(cur)
+        df = pd.DataFrame(rates)
+        short_rate = pd.rolling_mean(df, window=short_period, min_periods=1)[0].iloc[-1]
+        long_rate = pd.rolling_mean(df, window=long_period, min_periods=1)[0].iloc[-1]
+        # TODO remove the sys writes
+        if short_rate > long_rate:
+            sys.stdout.write("Short higher : ")
+            rate = short_rate if rates[-1] < short_rate else rates[-1]
+        else:
+            sys.stdout.write("Long  higher : ")
+            rate = long_rate
+        rate = rate * 1.05
+        return rate
