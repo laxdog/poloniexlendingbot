@@ -4,6 +4,7 @@ import threading
 import time
 import traceback
 import datetime
+import collections
 import pandas as pd
 from cStringIO import StringIO
 
@@ -73,22 +74,32 @@ class MarketAnalysis(object):
     def update_market_loop(self, cur):
         try:
             self.update_market(cur)
-            self.delete_old_data(cur)
+            # self.delete_old_data(cur)
         except Exception as ex:
             ex.message = ex.message if ex.message else str(ex)
             print("Error in MarketAnalysis: {0}".format(ex.message))
             traceback.print_exc()
 
     def update_market(self, cur):
-        with open(self.open_files[cur], 'a') as f:
-            writer = csv.writer(f, lineterminator='\n')
-            length = 10
-            raw_data = self.api.return_loan_orders(cur, length)['offers']
-            market_data = [time.time()]
-            for i in xrange(length):
-                market_data.extend([raw_data[i]['rate']])
-                market_data.extend([raw_data[i]['amount']])
-            writer.writerow(market_data)
+        """
+        Use a deque instead of delete_old_data, this works well but I'm worried about the read times on the file. In
+        the future I think we should implement a solution using sqllite.
+        """
+        tail = collections.deque(maxlen=10000)
+        for order_book in open(self.open_files[cur]):
+            tail.append(order_book)
+        length = 10  # Depth of the book to capture
+        raw_data = self.api.return_loan_orders(cur, length)['offers']
+        market_data = [time.time()]
+        for i in xrange(length):
+            market_data.extend([raw_data[i]['rate']])
+            market_data.extend([raw_data[i]['amount']])
+        market_data.append("\n")
+        tail.append(",".join([str(x) for x in market_data]))
+
+        with open(self.open_files[cur], "w") as of:
+            for line in tail:
+                of.write(line)
 
     def delete_old_data(self, cur):
         with open(self.open_files[cur], 'rb') as file_a:
