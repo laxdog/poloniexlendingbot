@@ -4,8 +4,9 @@ import threading
 import time
 import traceback
 import datetime
-import collections
 import pandas as pd
+import sqlite3 as lite
+from sqlite3 import Error
 from cStringIO import StringIO
 
 # Bot libs
@@ -23,11 +24,12 @@ except ImportError as ex:
 # TODO
 # [x] Thread the market data writing
 # [x] Make write times more deterministic
-# [ ] Write to sqllite (people can use other DBs then if they like)
+# [x] Write to sqllite (people can use other DBs then if they like)
 # [ ] Reduce the time in the config file to allow 1 sec
 # [ ] Record more data (we can work out what to do with it later)
 # [ ] Provide something that takes into account dust offers. (The golden cross works well on BTC, not slower markets)
 # [ ] RE: above. Weighted rate.
+# [ ] Add docstring to everything
 
 # NOTES
 # * A possible solution for the dust problem is take the top 10 offers and if the offer amount is less than X% of the
@@ -42,10 +44,10 @@ class MarketAnalysis(object):
         self.update_interval = int(config.get('BOT', 'analyseUpdateInterval', 60, 10, 3600))
         self.api = api
         self.lending_style = int(config.get('BOT', 'lendingStyle', 50, 1, 99))
+        self.db_con = self.create_connection()
 
         if len(self.currencies_to_analyse) != 0:
             for currency in self.currencies_to_analyse:
-
                 try:
                     self.api.api_query("returnLoanOrders", {'currency': currency, 'limit': '5'})
                 except Exception as cur_ex:
@@ -53,18 +55,18 @@ class MarketAnalysis(object):
                           "' to analyse the market of, please check your settings. Error message: " + str(cur_ex)
                     exit(1)
 
-                else:
-                    path = "market_data/" + currency + "_market_data.csv"
-                    self.open_files[currency] = path
-
     def run(self):
+        for cur in self.currencies_to_analyse:
+            db_con = self.create_connection()
+            self.create_rate_table(db_con, cur)
+            db_con.close()
         thread = threading.Thread(target=self.run_threads)
         thread.deamon = True
         thread.start()
 
     def run_threads(self):
         while True:
-            for cur in self.open_files:
+            for cur in self.currencies_to_analyse:
                 thread = threading.Thread(target=self.update_market_loop, args=(cur,))
                 thread.deamon = False
                 thread.start()
@@ -81,25 +83,22 @@ class MarketAnalysis(object):
             traceback.print_exc()
 
     def update_market(self, cur):
-        """
-        Use a deque instead of delete_old_data, this works well but I'm worried about the read times on the file. In
-        the future I think we should implement a solution using sqllite.
-        """
-        tail = collections.deque(maxlen=10000)
-        for order_book in open(self.open_files[cur]):
-            tail.append(order_book)
-        length = 10  # Depth of the book to capture
-        raw_data = self.api.return_loan_orders(cur, length)['offers']
-        market_data = [time.time()]
-        for i in xrange(length):
-            market_data.extend([raw_data[i]['rate']])
-            market_data.extend([raw_data[i]['amount']])
-        market_data.append("\n")
-        tail.append(",".join([str(x) for x in market_data]))
-
-        with open(self.open_files[cur], "w") as of:
-            for line in tail:
-                of.write(line)
+        levels = 10  # Depth of the book to capture
+        raw_data = self.api.return_loan_orders(cur, levels)['offers']
+        market_data = []
+        for i in xrange(levels):
+            market_data.append(str(raw_data[i]['rate']))
+            market_data.append(str(raw_data[i]['amount']))
+        market_data.append('0')
+        insert_sql = "INSERT INTO {0} (".format(cur)
+        for level in xrange(levels):
+            insert_sql += "rate{0}, ".format(level)
+            insert_sql += "amnt{0}, ".format(level)
+        insert_sql += "percentile"
+        insert_sql += ") VALUES ({0});".format(','.join(market_data))
+        db_con = self.create_connection()
+        with db_con:
+            db_con.execute(insert_sql)
 
     def delete_old_data(self, cur):
         with open(self.open_files[cur], 'rb') as file_a:
@@ -163,11 +162,11 @@ class MarketAnalysis(object):
         http://stackoverflow.com/questions/2374640/how-do-i-calculate-percentiles-with-python-numpy/2753343#2753343
         Find the percentile of a list of values.
 
-        @parameter N - is a list of values. Note N MUST BE already sorted.
-        @parameter percent - a float value from 0.0 to 1.0.
-        @parameter key - optional key function to compute value from each element of N.
+        :parameter N: A list of values. Note N MUST BE already sorted.
+        :parameter percent: A float value from 0.0 to 1.0.
+        :parameter key: Optional key function to compute value from each element of N.
 
-        @return - the percentile of the values
+        :return: Percentile of the values
         """
         import math
         if not N:
@@ -201,5 +200,48 @@ class MarketAnalysis(object):
         else:
             sys.stdout.write("Long  higher : ")
             rate = long_rate
+        # TODO Needs config option
         rate = rate * 1.05
         return rate
+
+    def create_connection(self, db_path='/tmp/plb.db', db_type='sqlite3'):
+        """
+        Create a connection to the sqlite DB. This will create a new file if one doesn't exist.  We can use :memory:
+        here for db_path if we don't want to store the data on disk
+
+        :param db_path: DB file
+        :return: Connection object or None
+        """
+        try:
+            con = lite.connect(db_path)
+            return con
+        except Error as ex:
+            print(ex.message)
+
+        return None
+
+    def create_rate_table(self, db_con, cur, levels=10):
+        """
+        Create a new table to hold rate data. This will DELETE EXISTING TABLES, so make sure to check the table doesn't
+        exist or you don't need the data first.
+
+        :param db_con: Open connection to the database
+        :param cur: The currency being stored in the DB. There's a table for each currency.
+        :param levels: The depth of offered rates to store
+        """
+        with db_con:
+            cursor = db_con.cursor()
+            cursor.execute("DROP TABLE IF EXISTS {0}".format(cur))
+            create_table_sql = "CREATE TABLE {0} (id INTEGER PRIMARY KEY AUTOINCREMENT,".format(cur) + \
+                               "created_at integer(4) not null default (strftime('%s','now')),"
+            for level in xrange(levels):
+                create_table_sql += "rate{0} FLOAT, ".format(level)
+                create_table_sql += "amnt{0} FLOAT, ".format(level)
+            create_table_sql += "percentile FLOAT);"
+            db_con.execute(create_table_sql)
+
+            # insert_sql = "INSERT INTO {0} (rate1, amnt1) VALUES (1.2, 3.4)".format(cur)
+            # db_con.execute(insert_sql)
+            # data = cursor.execute("SELECT * FROM {0}".format(cur)).fetchall()
+            # print(data)
+            # print("Done")
