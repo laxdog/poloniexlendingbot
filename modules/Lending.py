@@ -165,6 +165,7 @@ def cancel_all():
 
 
 def lend_all():
+    print("Rate : {0}".format(Analysis.get_rate_suggestion('BTC')))
     total_lended = Data.get_total_lended()[0]
     lending_balances = api.return_available_account_balances("lending")['lending']
     if dry_run:  # just fake some numbers, if dryrun (testing)
