@@ -1,5 +1,4 @@
 import os
-import csv
 import sys
 import threading
 import time
@@ -8,7 +7,6 @@ import datetime
 import pandas as pd
 import sqlite3 as lite
 from sqlite3 import Error
-from cStringIO import StringIO
 
 # Bot libs
 from modules.Configuration import FULL_LIST
@@ -23,14 +21,12 @@ except ImportError as ex:
     use_numpy = False
 
 # TODO
-# [x] Thread the market data writing
-# [x] Make write times more deterministic
-# [x] Write to sqllite (people can use other DBs then if they like)
 # [ ] Reduce the time in the config file to allow 1 sec
-# [ ] Record more data (we can work out what to do with it later)
+# [x] Record more data (we can work out what to do with it later)
 # [ ] Provide something that takes into account dust offers. (The golden cross works well on BTC, not slower markets)
 # [ ] RE: above. Weighted rate.
 # [ ] Add docstring to everything
+# [ ] Unit tests
 
 # NOTES
 # * A possible solution for the dust problem is take the top 10 offers and if the offer amount is less than X% of the
@@ -68,26 +64,49 @@ class MarketAnalysis(object):
         thread = threading.Thread(target=self.run_threads)
         thread.deamon = True
         thread.start()
+        del_thread = threading.Thread(target=self.run_del_threads)
+        del_thread.deamon = True
+        del_thread.start()
 
     def run_threads(self):
         while True:
             for cur in self.currencies_to_analyse:
-                thread = threading.Thread(target=self.update_market_loop, args=(cur,))
+                thread = threading.Thread(target=self.update_market_thread, args=(cur,))
                 thread.deamon = False
                 thread.start()
             # TODO Set this back to the config value
             time.sleep(1)
 
-    def update_market_loop(self, cur):
+    def run_del_threads(self):
+        while True:
+            for cur in self.currencies_to_analyse:
+                del_thread = threading.Thread(target=self.delete_old_data_thread, args=(cur,))
+                del_thread.daemon = True
+                del_thread.start()
+            # TODO set a reasonable default and allow config
+            time.sleep(30)
+
+    def update_market_thread(self, cur):
         try:
-            self.update_market(cur, self.recorded_levels)
-            # self.delete_old_data(cur)
+            db_con = self.create_connection()
+            self.update_market(db_con, cur, self.recorded_levels)
         except Exception as ex:
             ex.message = ex.message if ex.message else str(ex)
             print("Error in MarketAnalysis: {0}".format(ex.message))
             traceback.print_exc()
 
-    def update_market(self, cur, levels=10):
+    def delete_old_data_thread(self, cur):
+        time_in_sec = 30  # TODO Take this from config
+        while True:
+            try:
+                db_con = self.create_connection()
+                self.delete_old_data(db_con, cur, time_in_sec)
+            except Exception as ex:
+                ex.message = ex.message if ex.message else str(ex)
+                print("Error in MarketAnalysis: {0}".format(ex.message))
+                traceback.print_exc()
+
+    def update_market(self, db_con, cur, levels=10):
         raw_data = self.api.return_loan_orders(cur, levels)['offers']
         market_data = []
         for i in xrange(levels):
@@ -100,22 +119,22 @@ class MarketAnalysis(object):
             insert_sql += "amnt{0}, ".format(level)
         insert_sql += "percentile"
         insert_sql += ") VALUES ({0});".format(','.join(market_data))
-        db_con = self.create_connection()
         with db_con:
             db_con.execute(insert_sql)
 
-    def delete_old_data(self, cur):
-        with open(self.open_files[cur], 'rb') as file_a:
-            new_a_buf = StringIO()
-            writer = csv.writer(new_a_buf)
-            reader2 = csv.reader(file_a)
-            for row in reader2:
-                if self.get_day_difference(row[0]) < self.max_age:
-                    writer.writerow(row)
+    def delete_old_data(self, db_con, cur, seconds):
+        """
+        Delete old data from the database
 
-        # At this point, the contents (new_a_buf) exist in memory
-        with open(self.open_files[cur], 'wb') as file_b:
-            file_b.write(new_a_buf.getvalue())
+        :param db_con: Connection to the database
+        :param cur: The currency (table) to remove data from
+        :param seconds: The time in seconds of the oldest data to be kept
+        """
+        del_time = int(time.time()) - seconds
+        with db_con:
+            query = "DELETE FROM {0} WHERE unixtime < {1};".format(cur, del_time)
+            cursor = db_con.cursor()
+            cursor.execute(query)
 
     @staticmethod
     def get_day_difference(date_time):  # Will be a number of seconds since epoch
@@ -238,7 +257,7 @@ class MarketAnalysis(object):
         """
         Create a new table to hold rate data.
 
-        :param db_con: Open connection to the database
+        :param db_con: Connection to the database
         :param cur: The currency being stored in the DB. There's a table for each currency.
         :param levels: The depth of offered rates to store
         """
@@ -263,6 +282,7 @@ class MarketAnalysis(object):
         """
         Query the DB for all rates for a particular currency
 
+        :param db_con: Connection to the database
         :param cur: The currency you want to get the rates for
         :param from_date: The earliest data you want, specified in unix time (seconds since epoch)
         :param to_date: The latest data you want, specified in unix time (seconds since epoch)
