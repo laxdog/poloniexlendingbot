@@ -1,3 +1,4 @@
+import os
 import csv
 import sys
 import threading
@@ -44,7 +45,10 @@ class MarketAnalysis(object):
         self.update_interval = int(config.get('BOT', 'analyseUpdateInterval', 60, 10, 3600))
         self.api = api
         self.lending_style = int(config.get('BOT', 'lendingStyle', 50, 1, 99))
-        self.levels = 90
+        self.recorded_levels = 90
+        self.modules_dir = os.path.dirname(os.path.realpath(__file__))
+        self.top_dir = os.path.dirname(self.modules_dir)
+        self.db_dir = os.path.join(self.top_dir, 'market_data')
         self.db_con = self.create_connection()
 
         if len(self.currencies_to_analyse) != 0:
@@ -59,7 +63,7 @@ class MarketAnalysis(object):
     def run(self):
         for cur in self.currencies_to_analyse:
             db_con = self.create_connection()
-            # self.create_rate_table(db_con, cur, self.levels)
+            self.create_rate_table(db_con, cur, self.recorded_levels)
             db_con.close()
         thread = threading.Thread(target=self.run_threads)
         thread.deamon = True
@@ -76,7 +80,7 @@ class MarketAnalysis(object):
 
     def update_market_loop(self, cur):
         try:
-            self.update_market(cur, self.levels)
+            self.update_market(cur, self.recorded_levels)
             # self.delete_old_data(cur)
         except Exception as ex:
             ex.message = ex.message if ex.message else str(ex)
@@ -212,7 +216,7 @@ class MarketAnalysis(object):
         rate = rate * 1.05
         return rate
 
-    def create_connection(self, db_path='/tmp/plb.db', db_type='sqlite3'):
+    def create_connection(self, db_path=None, db_type='sqlite3'):
         """
         Create a connection to the sqlite DB. This will create a new file if one doesn't exist.  We can use :memory:
         here for db_path if we don't want to store the data on disk
@@ -220,6 +224,8 @@ class MarketAnalysis(object):
         :param db_path: DB file
         :return: Connection object or None
         """
+        if db_path is None:
+            db_path = os.path.join(self.db_dir, 'plb.db')
         try:
             con = lite.connect(db_path)
             return con
@@ -230,8 +236,7 @@ class MarketAnalysis(object):
 
     def create_rate_table(self, db_con, cur, levels=10):
         """
-        Create a new table to hold rate data. This will DELETE EXISTING TABLES, so make sure to check the table doesn't
-        exist or you don't need the data first.
+        Create a new table to hold rate data.
 
         :param db_con: Open connection to the database
         :param cur: The currency being stored in the DB. There's a table for each currency.
@@ -239,8 +244,8 @@ class MarketAnalysis(object):
         """
         with db_con:
             cursor = db_con.cursor()
-            cursor.execute("DROP TABLE IF EXISTS {0}".format(cur))
-            create_table_sql = "CREATE TABLE {0} (id INTEGER PRIMARY KEY AUTOINCREMENT,".format(cur) + \
+            # cursor.execute("DROP TABLE IF EXISTS {0}".format(cur))
+            create_table_sql = "CREATE TABLE IF NOT EXISTS {0} (id INTEGER PRIMARY KEY AUTOINCREMENT,".format(cur) + \
                                "unixtime integer(4) not null default (strftime('%s','now')),"
             for level in xrange(levels):
                 create_table_sql += "rate{0} FLOAT, ".format(level)
