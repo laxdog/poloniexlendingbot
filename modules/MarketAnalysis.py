@@ -45,7 +45,6 @@ class MarketAnalysis(object):
         self.modules_dir = os.path.dirname(os.path.realpath(__file__))
         self.top_dir = os.path.dirname(self.modules_dir)
         self.db_dir = os.path.join(self.top_dir, 'market_data')
-        self.db_con = self.create_connection()
 
         if len(self.currencies_to_analyse) != 0:
             for currency in self.currencies_to_analyse:
@@ -58,15 +57,15 @@ class MarketAnalysis(object):
 
     def run(self):
         for cur in self.currencies_to_analyse:
-            db_con = self.create_connection()
-            self.create_rate_table(db_con, cur, self.recorded_levels)
+            db_con = self.create_connection(cur)
+            self.create_rate_table(db_con, self.recorded_levels)
             db_con.close()
         thread = threading.Thread(target=self.run_threads)
         thread.deamon = True
         thread.start()
-        del_thread = threading.Thread(target=self.run_del_threads)
-        del_thread.deamon = True
-        del_thread.start()
+        # del_thread = threading.Thread(target=self.run_del_threads)
+        # del_thread.deamon = True
+        # del_thread.start()
 
     def run_threads(self):
         while True:
@@ -88,7 +87,7 @@ class MarketAnalysis(object):
 
     def update_market_thread(self, cur):
         try:
-            db_con = self.create_connection()
+            db_con = self.create_connection(cur)
             self.update_market(db_con, cur, self.recorded_levels)
         except Exception as ex:
             ex.message = ex.message if ex.message else str(ex)
@@ -96,24 +95,24 @@ class MarketAnalysis(object):
             traceback.print_exc()
 
     def delete_old_data_thread(self, cur):
-        time_in_sec = 30  # TODO Take this from config
+        time_in_sec = 1800  # TODO Take this from config
         while True:
             try:
-                db_con = self.create_connection()
-                self.delete_old_data(db_con, cur, time_in_sec)
+                db_con = self.create_connection(cur)
+                self.delete_old_data(db_con, time_in_sec)
             except Exception as ex:
                 ex.message = ex.message if ex.message else str(ex)
                 print("Error in MarketAnalysis: {0}".format(ex.message))
                 traceback.print_exc()
 
-    def update_market(self, db_con, cur, levels=10):
+    def update_market(self, db_con, cur, levels):
         raw_data = self.api.return_loan_orders(cur, levels)['offers']
         market_data = []
         for i in xrange(levels):
             market_data.append(str(raw_data[i]['rate']))
             market_data.append(str(raw_data[i]['amount']))
         market_data.append('0')
-        insert_sql = "INSERT INTO {0} (".format(cur)
+        insert_sql = "INSERT INTO loans ("
         for level in xrange(levels):
             insert_sql += "rate{0}, ".format(level)
             insert_sql += "amnt{0}, ".format(level)
@@ -122,7 +121,7 @@ class MarketAnalysis(object):
         with db_con:
             db_con.execute(insert_sql)
 
-    def delete_old_data(self, db_con, cur, seconds):
+    def delete_old_data(self, db_con, seconds):
         """
         Delete old data from the database
 
@@ -132,7 +131,7 @@ class MarketAnalysis(object):
         """
         del_time = int(time.time()) - seconds
         with db_con:
-            query = "DELETE FROM {0} WHERE unixtime < {1};".format(cur, del_time)
+            query = "DELETE FROM loans WHERE unixtime < {0};".format(del_time)
             cursor = db_con.cursor()
             cursor.execute(query)
 
@@ -148,11 +147,15 @@ class MarketAnalysis(object):
             raise ValueError("{0} is not a valid currency, must be one of {1}".format(cur, FULL_LIST))
         if cur not in self.currencies_to_analyse:
             return []
-        db_con = self.create_connection()
-        rates = self.get_rates_from_db(db_con, cur)
+        db_con = self.create_connection(cur)
+        # TODO Remove hardcoded values
+        rates = self.get_rates_from_db(db_con, from_date=time.time() - 1900)
         df = pd.DataFrame(rates)
+        if len(rates) < 1800:
+            return df
         # convert unixtimes to datetimes so we can resample
         df[0] = pd.to_datetime(df[0], unit='s')
+        # Resample into 1 second intervals, average if we get two in the same second and fill any empty spaces
         df = df.resample('1s', on=0).mean().ffill()
         # with open(self.open_files[cur], 'r') as f:
         #     reader = csv.reader(f)
@@ -175,6 +178,9 @@ class MarketAnalysis(object):
                 rates = [x[1] for x in rates]
                 return self.get_percentile(rates, self.lending_style)
             elif method == 'golden_cross':
+                if len(rates) < 1800:
+                    print("\nNeed more data for analysis, still collecting. I have {} records".format(len(rates)))
+                    return 0
                 rate = truncate(self.get_golden_cross_rate(cur, rates), 6)
                 print("Cur: {0}, Golden : {1}, Percent {2}, Best: {3}"
                       .format(cur, rate, self.get_percentile(rates, self.lending_style), rates.iloc[-1][1]))
@@ -235,16 +241,17 @@ class MarketAnalysis(object):
         rate = rate * 1.05
         return rate
 
-    def create_connection(self, db_path=None, db_type='sqlite3'):
+    def create_connection(self, cur, db_dir=None, db_type='sqlite3'):
         """
         Create a connection to the sqlite DB. This will create a new file if one doesn't exist.  We can use :memory:
         here for db_path if we don't want to store the data on disk
 
-        :param db_path: DB file
+        :param cur: The currency (table) in the DB
+        :param db_path: DB directory
         :return: Connection object or None
         """
-        if db_path is None:
-            db_path = os.path.join(self.db_dir, 'plb.db')
+        if db_dir is None:
+            db_path = os.path.join(self.db_dir, '{0}.db'.format(cur))
         try:
             con = lite.connect(db_path)
             return con
@@ -253,7 +260,7 @@ class MarketAnalysis(object):
 
         return None
 
-    def create_rate_table(self, db_con, cur, levels=10):
+    def create_rate_table(self, db_con, levels):
         """
         Create a new table to hold rate data.
 
@@ -264,7 +271,7 @@ class MarketAnalysis(object):
         with db_con:
             cursor = db_con.cursor()
             # cursor.execute("DROP TABLE IF EXISTS {0}".format(cur))
-            create_table_sql = "CREATE TABLE IF NOT EXISTS {0} (id INTEGER PRIMARY KEY AUTOINCREMENT,".format(cur) + \
+            create_table_sql = "CREATE TABLE IF NOT EXISTS loans (id INTEGER PRIMARY KEY AUTOINCREMENT," + \
                                "unixtime integer(4) not null default (strftime('%s','now')),"
             for level in xrange(levels):
                 create_table_sql += "rate{0} FLOAT, ".format(level)
@@ -278,7 +285,7 @@ class MarketAnalysis(object):
             # print(data)
             # print("Done")
 
-    def get_rates_from_db(self, db_con, cur, from_date=None, to_date=None, price_levels=['rate0']):
+    def get_rates_from_db(self, db_con, from_date=None, to_date=None, price_levels=['rate0']):
         """
         Query the DB for all rates for a particular currency
 
@@ -292,7 +299,7 @@ class MarketAnalysis(object):
         """
         with db_con:
             cursor = db_con.cursor()
-            query = "SELECT unixtime, {0} FROM {1} ".format(",".join(price_levels), cur)
+            query = "SELECT unixtime, {0} FROM loans ".format(",".join(price_levels))
             if from_date is not None and to_date is not None:
                 query += "WHERE unixtime > {0} AND unixtime < {1}".format(from_date, to_date)
             if from_date is not None:
