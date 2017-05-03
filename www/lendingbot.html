@@ -25,34 +25,58 @@
     <title>Poloniex Lending Bot</title>
 
     <!-- Bootstrap Core CSS -->
-    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" rel="stylesheet">
-    
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+
     <!-- jQuery Version 1.12.2 -->
     <script src="https://code.jquery.com/jquery-1.12.2.min.js"></script>
 
     <!-- Bootstrap Core JavaScript -->
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
-    
-    <script src="lendingbot.js" ></script>
-    
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+
+    <!-- toastr -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" rel="stylesheet">
+
+    <script src="lendingbot.js?version=1" ></script>
+
     <style>
-        body {
-		padding-top: 50px;
-	}
+        .brand-margin{
+            margin-top:4px;
+            margin-bottom:4px
+        }
+
         .inlinediv {
-		display: inline-block;
-		padding-right: 5%;
-		vertical-align: top;
-	}
-	.plb-tooltip {
-		white-space: nowrap;
-		text-decoration: none;
-		border-bottom: 1px dotted;
-		color: black;
-	}
-	.plb-tooltip:hover {
-		text-decoration: none;
-	}
+            display: inline-block;
+            padding-right: 5%;
+            vertical-align: top;
+        }
+        .plb-tooltip {
+            white-space: nowrap;
+            text-decoration: none;
+            border-bottom: 1px dotted;
+            color: black;
+        }
+        .plb-tooltip:hover {
+            text-decoration: none;
+        }
+
+        form h5 {
+            font-weight: 700;
+        }
+
+        form p,
+        form h5 {
+            margin-bottom: 5px;
+        }
+
+        .nav .glyphicon {
+            color: black;
+        }
+
+        #file,
+        #input-file {
+            display: none;
+        }
     </style>
 
 </head>
@@ -61,21 +85,46 @@
     <!-- Page Content -->
     <nav class="navbar navbar-default navbar-fixed-top">
         <div class="container">
-            <div class="row">
-                <div class="col-xs-7">
-                    <h4>
-                        Poloniex Lending Bot
-                    </h4>
+
+            <!-- Brand and toggle get grouped for better mobile display -->
+            <div class="navbar-header" style="margin-left:8px">
+                <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1" aria-expanded="false">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <img src="images/icon192.png" height="32" width="32" style="margin-top: 8px;margin-right: 8px;margin-left: -15px;vertical-align:top">
+                <div style="display:inline-block">
+                    <h4 class="brand-margin">Poloniex Lending Bot</h4>
+                    <h5 class="brand-margin" id="updated">Not updated</h5>
                 </div>
-                <div class="col-xs-5" style="text-align:right;margin: 10px auto;" >
-                    <span id="updated">Not updated</span>
-                </div>
+            </div>
+
+            <!-- Collect the nav links, forms, and other content for toggling -->
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                <ul class="nav navbar-nav navbar-right">
+                    <li id="file" data-toggle="collapse" data-target=".navbar-collapse.in">
+                        <a href="#" onclick="$('#input-file').trigger('click');">
+                            <i class="glyphicon glyphicon-file"></i>
+                            Select log
+                        </a>
+                    </li>
+                    <li data-toggle="collapse" data-target=".navbar-collapse.in">
+                        <a href="#" data-toggle="modal" data-target="#settings_modal">
+                            <i class="glyphicon glyphicon-cog"></i>
+                            Settings
+                        </a>
+                    </li>
+                </ul>
             </div>
         </div>
     </nav>
-    <div class="container">
+
+    <input type="file" id="input-file" name="file" onchange="handleLocalFile(this.files[0])" />
+
+    <div class="container" style="padding-top:50px">
         <div class="row" style="overflow-x:auto">
-            <div id="file" style="margin-top:8px;display:none" >Select log file: <input type="file" name="file" style="display:inline-block" onchange="handleLocalFile(this.files[0])" /></div>
             <table class="table table-responsive">
                 <thead>
                     <tr>
@@ -93,14 +142,95 @@
                         <th colspan="2">Log (Reversed ordered):</th>
                     </tr>
                 </thead>
-                <tbody id="logtable">                   
+                <tbody id="logtable">
                 </tbody>
             </table>
         </div>
     </div>
     <!-- /.container -->
-    
 
+
+    <div class="modal fade" id="settings_modal" tabindex="-1" role="dialog">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                    <h4 class="modal-title">Settings</h4>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div class="form-group">
+                            <label for="refresh_interval">Page Refresh interval (10-60 seconds)</label>
+                            <input type="number" class="form-control" id="refresh_interval" placeholder="(10-60)">
+                        </div>
+
+                        <div class="form-group">
+                            <h5>Date ranges to display earnings for</h5>
+                            <label class="checkbox-inline">
+                                <input data-timespan="Hour" type="checkbox"> Hourly
+                            </label>
+                            <label class="checkbox-inline">
+                                <input data-timespan="Day" type="checkbox"> Daily
+                            </label>
+                            <label class="checkbox-inline">
+                                <input data-timespan="Week" type="checkbox"> Weekly
+                            </label>
+                            <label class="checkbox-inline">
+                                <input data-timespan="Month" type="checkbox"> Monthly
+                            </label>
+                            <label class="checkbox-inline">
+                                <input data-timespan="Year" type="checkbox"> Yearly
+                            </label>
+                        </div>
+
+                        <div class="form-group">
+                            <h5>Bitcoin Display Unit</h5>
+                            <label class="radio-inline">
+                                <input value="BTC" type="radio" name="btcDisplayUnit"> BTC
+                            </label>
+                            <label class="radio-inline">
+                                <input value="mBTC" type="radio" name="btcDisplayUnit"> mBTC
+                            </label>
+                            <label class="radio-inline">
+                                <input value="Bits" type="radio" name="btcDisplayUnit"> Bits
+                            </label>
+                            <label class="radio-inline">
+                                <input value="Satoshi" type="radio" name="btcDisplayUnit"> Satoshi
+                            </label>
+                        </div>
+
+                        <div class="form-group">
+                            <h5>Which earnings are displayed in selected output currency</h5>
+                            <label class="radio-inline">
+                                <input value="all" type="radio" name="outputCurrencyDisplayMode"> All Coins
+                            </label>
+                            <label class="radio-inline">
+                                <input value="summary" type="radio" name="outputCurrencyDisplayMode"> Only Summary
+                            </label>
+                        </div>
+
+                        <div class="form-group">
+                            <h5>Effective loan rates calculation</h5>
+                            <p class="small">Effective rate can either take into consideration the actual amount actively lent OR consider only Poloniex 15% fee</p>
+                            <label class="radio-inline">
+                                <input value="lentperc" type="radio" name="effRateMode"> Fee and Effective Lent
+                            </label>
+                            <label class="radio-inline">
+                                <input value="onlyfee" type="radio" name="effRateMode"> Fee Only
+                            </label>
+                        </div>
+
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="doSave()">Save changes</button>
+                </div>
+            </div><!-- /.modal-content -->
+        </div><!-- /.modal-dialog -->
+    </div><!-- /.modal -->
 </body>
 
 </html>
