@@ -21,8 +21,6 @@ except ImportError as ex:
     use_numpy = False
 
 # TODO
-# [ ] Reduce the time in the config file to allow 1 sec
-# [x] Record more data (we can work out what to do with it later)
 # [ ] Provide something that takes into account dust offers. (The golden cross works well on BTC, not slower markets)
 # [ ] RE: above. Weighted rate.
 # [ ] Add docstring to everything
@@ -45,10 +43,12 @@ class MarketAnalysis(object):
         self.modules_dir = os.path.dirname(os.path.realpath(__file__))
         self.top_dir = os.path.dirname(self.modules_dir)
         self.db_dir = os.path.join(self.top_dir, 'market_data')
+        self.recorded_levels = int(config.get('MarketAnalysis', 'recorded_levels', 10, 1))
         self.MACD_long_win_seconds = int(config.get('MarketAnalysis', 'MACD_long_win_seconds', 1800, 60))
         self.MACD_short_win_seconds = int(config.get('MarketAnalysis', 'MACD_short_win_seconds', 150, 1))
         self.percentile_seconds = int(config.get('MarketAnalysis', 'percentile_seconds', 150, 1))
         self.keep_history_seconds = int(config.get('MarketAnalysis', 'keep_history_seconds', 150, 1))
+        self.daily_min_multiplier = float(config.get('Daily_min', 'multiplier', 1.05, 1))
 
         if len(self.currencies_to_analyse) != 0:
             for currency in self.currencies_to_analyse:
@@ -234,7 +234,9 @@ class MarketAnalysis(object):
         result = truncate(result, 6)
         return result
 
-    def get_golden_cross_rate(self, cur, rates_df, short_period=150, long_period=1800):
+    def get_golden_cross_rate(self, cur, rates_df, short_period, long_period, multiplier=None):
+        if multiplier is None:
+            multiplier = self.daily_min_multiplier
         short_rate = rates_df.rate0.tail(short_period).mean()
         long_rate = rates_df.rate0.tail(long_period).mean()
         # TODO remove the sys writes
@@ -244,8 +246,7 @@ class MarketAnalysis(object):
         else:
             sys.stdout.write("Long  higher : ")
             rate = long_rate
-        # TODO Needs config option
-        rate = rate * 1.05
+        rate = rate * multiplier
         return rate
 
     def create_connection(self, cur, db_dir=None, db_type='sqlite3'):

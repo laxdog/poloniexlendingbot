@@ -158,9 +158,11 @@ MACD_long_win_seconds = 1800
 MACD_short_win_seconds = 150
 percentile_seconds = 1800
 keep_history_seconds = 1800
+recorded_levels = 10
 
 [Daily_min]
 method = 'golden_cross'
+multiplier = 1.05
 
 [Spread]
 method = 'golden_cross'
