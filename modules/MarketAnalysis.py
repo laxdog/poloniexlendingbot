@@ -41,7 +41,7 @@ class MarketAnalysis(object):
         self.update_interval = int(config.get('BOT', 'analyseUpdateInterval', 60, 10, 3600))
         self.api = api
         self.lending_style = int(config.get('BOT', 'lendingStyle', 50, 1, 99))
-        self.recorded_levels = 90
+        self.recorded_levels = 10
         self.modules_dir = os.path.dirname(os.path.realpath(__file__))
         self.top_dir = os.path.dirname(self.modules_dir)
         self.db_dir = os.path.join(self.top_dir, 'market_data')
@@ -60,21 +60,13 @@ class MarketAnalysis(object):
             db_con = self.create_connection(cur)
             self.create_rate_table(db_con, self.recorded_levels)
             db_con.close()
-        thread = threading.Thread(target=self.run_threads)
-        thread.deamon = True
-        thread.start()
-        # del_thread = threading.Thread(target=self.run_del_threads)
-        # del_thread.deamon = True
-        # del_thread.start()
+        self.run_threads()
 
     def run_threads(self):
-        while True:
-            for cur in self.currencies_to_analyse:
-                thread = threading.Thread(target=self.update_market_thread, args=(cur,))
-                thread.deamon = False
-                thread.start()
-            # TODO Set this back to the config value
-            time.sleep(1)
+        for cur in self.currencies_to_analyse:
+            thread = threading.Thread(target=self.update_market_thread, args=(cur,))
+            thread.deamon = True
+            thread.start()
 
     def run_del_threads(self):
         while True:
@@ -91,6 +83,7 @@ class MarketAnalysis(object):
             self.update_market(db_con, cur, self.recorded_levels)
         except Exception as ex:
             ex.message = ex.message if ex.message else str(ex)
+            print(dir(ex))
             print("Error in MarketAnalysis: {0}".format(ex.message))
             traceback.print_exc()
 
@@ -106,20 +99,25 @@ class MarketAnalysis(object):
                 traceback.print_exc()
 
     def update_market(self, db_con, cur, levels):
-        raw_data = self.api.return_loan_orders(cur, levels)['offers']
-        market_data = []
-        for i in xrange(levels):
-            market_data.append(str(raw_data[i]['rate']))
-            market_data.append(str(raw_data[i]['amount']))
-        market_data.append('0')
-        insert_sql = "INSERT INTO loans ("
-        for level in xrange(levels):
-            insert_sql += "rate{0}, ".format(level)
-            insert_sql += "amnt{0}, ".format(level)
-        insert_sql += "percentile"
-        insert_sql += ") VALUES ({0});".format(','.join(market_data))
-        with db_con:
-            db_con.execute(insert_sql)
+        while True:
+            print("Start {0} : {1}".format(cur, time.time()))
+            raw_data = self.api.return_loan_orders(cur, levels)['offers']
+            print("Got Data {0} : {1}".format(cur, time.time()))
+            market_data = []
+            for i in xrange(levels):
+                market_data.append(str(raw_data[i]['rate']))
+                market_data.append(str(raw_data[i]['amount']))
+            market_data.append('0')
+            insert_sql = "INSERT INTO loans ("
+            for level in xrange(levels):
+                insert_sql += "rate{0}, ".format(level)
+                insert_sql += "amnt{0}, ".format(level)
+            insert_sql += "percentile"
+            insert_sql += ") VALUES ({0});".format(','.join(market_data))
+            with db_con:
+                print("Open con {0} : {1}".format(cur, time.time()))
+                db_con.execute(insert_sql)
+            print("Exit {0} : {1}".format(cur, time.time()))
 
     def delete_old_data(self, db_con, seconds):
         """
@@ -149,23 +147,21 @@ class MarketAnalysis(object):
             return []
         db_con = self.create_connection(cur)
         # TODO Remove hardcoded values
-        rates = self.get_rates_from_db(db_con, from_date=time.time() - 1900)
+        price_levels = ['rate0']
+        rates = self.get_rates_from_db(db_con, from_date=time.time() - 1900, price_levels=price_levels)
         df = pd.DataFrame(rates)
-        if len(rates) < 1800:
-            return df
+        columns = ['time']
+        columns.extend(price_levels)
+        df.columns = columns
         # convert unixtimes to datetimes so we can resample
-        df[0] = pd.to_datetime(df[0], unit='s')
-        # Resample into 1 second intervals, average if we get two in the same second and fill any empty spaces
-        df = df.resample('1s', on=0).mean().ffill()
-        # with open(self.open_files[cur], 'r') as f:
-        #     reader = csv.reader(f)
-        #     rates = []
-        #     for row in reader:
-        #         rates.append(row[1])
-        #     rates = map(float, rates)
+        df.time = pd.to_datetime(df.time, unit='s')
+        # Resample into 1 second intervals, average if we get two in the same second and fill any empty spaces with the
+        # previous value
+        df = df.resample('1s', on='time').mean().ffill()
         return df
 
     def get_rate_suggestion(self, cur, rates=None, method='golden_cross'):
+        print('Get rate suggestion method')
         try:
             if rates is None:
                 rates = self.get_rate_list(cur)
@@ -178,19 +174,21 @@ class MarketAnalysis(object):
                 rates = [x[1] for x in rates]
                 return self.get_percentile(rates, self.lending_style)
             elif method == 'golden_cross':
-                if len(rates) < 1800:
+                # if len(rates) < 1800:
+                if len(rates) < 18:
                     print("\nNeed more data for analysis, still collecting. I have {} records".format(len(rates)))
                     return 0
                 rate = truncate(self.get_golden_cross_rate(cur, rates), 6)
                 print("Cur: {0}, Golden : {1}, Percent {2}, Best: {3}"
-                      .format(cur, rate, self.get_percentile(rates, self.lending_style), rates.iloc[-1][1]))
+                      .format(cur, rate, self.get_percentile(rates, self.lending_style), rates.rate0.iloc[-1]))
                 return rate
             else:
                 raise ValueError("{0} strategy not recognised")
 
         except Exception as ex:
             print("WARN: Exception found when analysing markets, if this happens for more than a couple minutes please "
-                  "make a Github issue so we can fix it. Otherwise, you can safely ignore it. Error: " + ex.message)
+                  "make a Github issue so we can fix it. Otherwise, you can safely ignore it. Error:"
+                  "{0}".format(ex.message))
             return 0
 
     @staticmethod
@@ -227,13 +225,12 @@ class MarketAnalysis(object):
         return result
 
     def get_golden_cross_rate(self, cur, rates_df, short_period=150, long_period=1800):
-        # TODO These don't need to be rolling mean, simple mean on the last X will do (and will be faster)
-        short_rate = pd.rolling_mean(rates_df[1], window=short_period, min_periods=1).iloc[-1]
-        long_rate = pd.rolling_mean(rates_df[1], window=long_period, min_periods=1).iloc[-1]
+        short_rate = rates_df.rate0.tail(short_period).mean()
+        long_rate = rates_df.rate0.tail(long_period).mean()
         # TODO remove the sys writes
         if short_rate > long_rate:
             sys.stdout.write("Short higher : ")
-            rate = short_rate if rates_df.iloc[-1][1] < short_rate else rates_df.iloc[-1][1]
+            rate = short_rate if rates_df.rate0.iloc[-1] < short_rate else rates_df.rate0.iloc[-1]
         else:
             sys.stdout.write("Long  higher : ")
             rate = long_rate
@@ -250,6 +247,7 @@ class MarketAnalysis(object):
         :param db_path: DB directory
         :return: Connection object or None
         """
+        print("New connection {0}".format(cur))
         if db_dir is None:
             db_path = os.path.join(self.db_dir, '{0}.db'.format(cur))
         try:
@@ -270,20 +268,14 @@ class MarketAnalysis(object):
         """
         with db_con:
             cursor = db_con.cursor()
-            # cursor.execute("DROP TABLE IF EXISTS {0}".format(cur))
             create_table_sql = "CREATE TABLE IF NOT EXISTS loans (id INTEGER PRIMARY KEY AUTOINCREMENT," + \
                                "unixtime integer(4) not null default (strftime('%s','now')),"
             for level in xrange(levels):
                 create_table_sql += "rate{0} FLOAT, ".format(level)
                 create_table_sql += "amnt{0} FLOAT, ".format(level)
             create_table_sql += "percentile FLOAT);"
+            cursor.execute("PRAGMA journal_mode=wal")
             cursor.execute(create_table_sql)
-
-            # insert_sql = "INSERT INTO {0} (rate1, amnt1) VALUES (1.2, 3.4)".format(cur)
-            # db_con.execute(insert_sql)
-            # data = cursor.execute("SELECT * FROM {0}".format(cur)).fetchall()
-            # print(data)
-            # print("Done")
 
     def get_rates_from_db(self, db_con, from_date=None, to_date=None, price_levels=['rate0']):
         """
@@ -293,6 +285,7 @@ class MarketAnalysis(object):
         :param cur: The currency you want to get the rates for
         :param from_date: The earliest data you want, specified in unix time (seconds since epoch)
         :param to_date: The latest data you want, specified in unix time (seconds since epoch)
+        #TODO Change NEEDVARIABLE below
         :price_level: We record multiple price levels in the DB, the best offer being rate0, up to whateve you have
         configure NEEDVARIABLE to. You can also ask for VWR, which is a special volume weight rate designed to skip
         'dust' offers
