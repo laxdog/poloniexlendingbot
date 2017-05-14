@@ -45,6 +45,10 @@ class MarketAnalysis(object):
         self.modules_dir = os.path.dirname(os.path.realpath(__file__))
         self.top_dir = os.path.dirname(self.modules_dir)
         self.db_dir = os.path.join(self.top_dir, 'market_data')
+        self.MACD_long_win_seconds = int(config.get('MarketAnalysis', 'MACD_long_win_seconds', 1800, 60))
+        self.MACD_short_win_seconds = int(config.get('MarketAnalysis', 'MACD_short_win_seconds', 150, 1))
+        self.percentile_seconds = int(config.get('MarketAnalysis', 'percentile_seconds', 150, 1))
+        self.keep_history_seconds = int(config.get('MarketAnalysis', 'keep_history_seconds', 150, 1))
 
         if len(self.currencies_to_analyse) != 0:
             for currency in self.currencies_to_analyse:
@@ -83,16 +87,14 @@ class MarketAnalysis(object):
             self.update_market(db_con, cur, self.recorded_levels)
         except Exception as ex:
             ex.message = ex.message if ex.message else str(ex)
-            print(dir(ex))
             print("Error in MarketAnalysis: {0}".format(ex.message))
             traceback.print_exc()
 
-    def delete_old_data_thread(self, cur):
-        time_in_sec = 1800  # TODO Take this from config
+    def delete_old_data_thread(self, cur, seconds):
         while True:
             try:
                 db_con = self.create_connection(cur)
-                self.delete_old_data(db_con, time_in_sec)
+                self.delete_old_data(db_con, seconds)
             except Exception as ex:
                 ex.message = ex.message if ex.message else str(ex)
                 print("Error in MarketAnalysis: {0}".format(ex.message))
@@ -100,9 +102,7 @@ class MarketAnalysis(object):
 
     def update_market(self, db_con, cur, levels):
         while True:
-            print("Start {0} : {1}".format(cur, time.time()))
             raw_data = self.api.return_loan_orders(cur, levels)['offers']
-            print("Got Data {0} : {1}".format(cur, time.time()))
             market_data = []
             for i in xrange(levels):
                 market_data.append(str(raw_data[i]['rate']))
@@ -115,9 +115,7 @@ class MarketAnalysis(object):
             insert_sql += "percentile"
             insert_sql += ") VALUES ({0});".format(','.join(market_data))
             with db_con:
-                print("Open con {0} : {1}".format(cur, time.time()))
                 db_con.execute(insert_sql)
-            print("Exit {0} : {1}".format(cur, time.time()))
 
     def delete_old_data(self, db_con, seconds):
         """
@@ -140,7 +138,9 @@ class MarketAnalysis(object):
         diff_days = (now - date1).days
         return diff_days
 
-    def get_rate_list(self, cur):
+    def get_rate_list(self, cur, seconds):
+        # Request more data from the DB than we need to allow for skipped seconds
+        request_seconds = int(seconds * 1.1)
         if cur not in FULL_LIST:
             raise ValueError("{0} is not a valid currency, must be one of {1}".format(cur, FULL_LIST))
         if cur not in self.currencies_to_analyse:
@@ -148,23 +148,34 @@ class MarketAnalysis(object):
         db_con = self.create_connection(cur)
         # TODO Remove hardcoded values
         price_levels = ['rate0']
-        rates = self.get_rates_from_db(db_con, from_date=time.time() - 1900, price_levels=price_levels)
+        rates = self.get_rates_from_db(db_con, from_date=time.time() - request_seconds, price_levels=price_levels)
         df = pd.DataFrame(rates)
         columns = ['time']
         columns.extend(price_levels)
         df.columns = columns
         # convert unixtimes to datetimes so we can resample
         df.time = pd.to_datetime(df.time, unit='s')
+        # If we don't have enough data return df, otherwise the resample will fill out all values with the same data
+        if len(df) < seconds:
+            return df
         # Resample into 1 second intervals, average if we get two in the same second and fill any empty spaces with the
         # previous value
         df = df.resample('1s', on='time').mean().ffill()
         return df
 
     def get_rate_suggestion(self, cur, rates=None, method='golden_cross'):
-        print('Get rate suggestion method')
+        if method == 'percentile':
+            seconds = self.percentile_seconds
+        elif method == 'golden_cross':
+            seconds = self.MACD_long_win_seconds
+        else:
+            print("Error: {0} method not recognised, falling back to percentile")
+            method == 'percentile'
+            seconds = self.percentile_seconds
+
         try:
             if rates is None:
-                rates = self.get_rate_list(cur)
+                rates = self.get_rate_list(cur, seconds)
             elif cur not in self.open_files:
                 return 0
             if len(rates) == 0:
@@ -174,16 +185,16 @@ class MarketAnalysis(object):
                 rates = [x[1] for x in rates]
                 return self.get_percentile(rates, self.lending_style)
             elif method == 'golden_cross':
-                # if len(rates) < 1800:
-                if len(rates) < 18:
-                    print("\nNeed more data for analysis, still collecting. I have {} records".format(len(rates)))
+                seconds = self.MACD_long_win_seconds
+                if len(rates) < seconds:
+                    print(" : Need more data for analysis, still collecting. I have {0}/{1} records"
+                          .format(len(rates), seconds))
                     return 0
-                rate = truncate(self.get_golden_cross_rate(cur, rates), 6)
+                rate = truncate(self.get_golden_cross_rate(cur, rates, self.MACD_long_win_seconds,
+                                                           self.MACD_short_win_seconds), 6)
                 print("Cur: {0}, Golden : {1}, Percent {2}, Best: {3}"
                       .format(cur, rate, self.get_percentile(rates, self.lending_style), rates.rate0.iloc[-1]))
                 return rate
-            else:
-                raise ValueError("{0} strategy not recognised")
 
         except Exception as ex:
             print("WARN: Exception found when analysing markets, if this happens for more than a couple minutes please "
@@ -213,7 +224,6 @@ class MarketAnalysis(object):
             return key(N[int(k)])
         d0 = key(N[int(f)]) * (c - k)
         d1 = key(N[int(c)]) * (k - f)
-        print("In percentile: {0}".format(d0 + d1))
         return d0 + d1
 
     def get_percentile(self, rates, lending_style, use_numpy=use_numpy):
@@ -247,7 +257,6 @@ class MarketAnalysis(object):
         :param db_path: DB directory
         :return: Connection object or None
         """
-        print("New connection {0}".format(cur))
         if db_dir is None:
             db_path = os.path.join(self.db_dir, '{0}.db'.format(cur))
         try:
