@@ -44,6 +44,7 @@ class MarketAnalysis(object):
         self.top_dir = os.path.dirname(self.modules_dir)
         self.db_dir = os.path.join(self.top_dir, 'market_data')
         self.recorded_levels = int(config.get('MarketAnalysis', 'recorded_levels', 10, 1))
+        self.data_tolerance = float(config.get('MarketAnalysis', 'data_tolerance', 50, 50, 0))
         self.MACD_long_win_seconds = int(config.get('MarketAnalysis', 'MACD_long_win_seconds', 1800, 60))
         self.MACD_short_win_seconds = int(config.get('MarketAnalysis', 'MACD_short_win_seconds', 150, 1))
         self.percentile_seconds = int(config.get('MarketAnalysis', 'percentile_seconds', 150, 1))
@@ -90,18 +91,6 @@ class MarketAnalysis(object):
             # TODO set a reasonable default and allow config
             time.sleep(30)
 
-    def update_market_thread(self, cur):
-        """
-        MOVING THIS NEXT COMMIT
-        """
-        try:
-            db_con = self.create_connection(cur)
-            self.update_market(db_con, cur, self.recorded_levels)
-        except Exception as ex:
-            ex.message = ex.message if ex.message else str(ex)
-            print("Error in MarketAnalysis: {0}".format(ex.message))
-            traceback.print_exc()
-
     def delete_old_data_thread(self, cur, seconds):
         """
         NOT YET IMPLEMENTED
@@ -115,17 +104,24 @@ class MarketAnalysis(object):
                 print("Error in MarketAnalysis: {0}".format(ex.message))
                 traceback.print_exc()
 
-    def update_market(self, db_con, cur, levels):
+    def update_market_thread(self, cur, levels=None):
         """
         This is where the main work is done for recording the market data. The loop will not exit and continuously
         polls Poloniex for the current loans in the book.
 
-        :param db_con: Connection to the database
         :param cur: The currency (database) to remove data from
         :param levels: The depth of offered rates to store
         """
+        if levels is None:
+            levels = self.recorded_levels
+        db_con = self.create_connection(cur)
         while True:
-            raw_data = self.api.return_loan_orders(cur, levels)['offers']
+            try:
+                raw_data = self.api.return_loan_orders(cur, levels)['offers']
+            except Exception as ex:
+                ex.message = ex.message if ex.message else str(ex)
+                print("Error in returning data from Poloniex: {0}".format(ex.message))
+                traceback.print_exc()
             market_data = []
             for i in xrange(levels):
                 market_data.append(str(raw_data[i]['rate']))
@@ -138,7 +134,12 @@ class MarketAnalysis(object):
             insert_sql += "percentile"
             insert_sql += ") VALUES ({0});".format(','.join(market_data))
             with db_con:
-                db_con.execute(insert_sql)
+                try:
+                    db_con.execute(insert_sql)
+                except Exception as ex:
+                    ex.message = ex.message if ex.message else str(ex)
+                    print("Error inserting market data into DB : {0}".format(ex.message))
+                    traceback.print_exc()
 
     def delete_old_data(self, db_con, seconds):
         """
@@ -192,8 +193,9 @@ class MarketAnalysis(object):
         df.columns = columns
         # convert unixtimes to datetimes so we can resample
         df.time = pd.to_datetime(df.time, unit='s')
-        # If we don't have enough data return df, otherwise the resample will fill out all values with the same data
-        if len(df) < seconds:
+        # If we don't have enough data return df, otherwise the resample will fill out all values with the same data.
+        # Missing data tolerance allows for a percentage to be ignored and filled in by resampling.
+        if len(df) < seconds * (self.data_tolerance / 100):
             return df
         # Resample into 1 second intervals, average if we get two in the same second and fill any empty spaces with the
         # previous value
@@ -234,9 +236,9 @@ class MarketAnalysis(object):
                 return self.get_percentile(rates, self.lending_style)
             elif method == 'golden_cross':
                 seconds = self.MACD_long_win_seconds
-                if len(rates) < seconds:
+                if len(rates) < seconds * (self.data_tolerance / 100):
                     print(" : Need more data for analysis, still collecting. I have {0}/{1} records"
-                          .format(len(rates), seconds))
+                          .format(len(rates), int(seconds * (self.data_tolerance / 100))))
                     return 0
                 rate = truncate(self.get_golden_cross_rate(cur, rates, self.MACD_long_win_seconds,
                                                            self.MACD_short_win_seconds), 6)
