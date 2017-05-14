@@ -60,6 +60,9 @@ class MarketAnalysis(object):
                     exit(1)
 
     def run(self):
+        """
+        Main entry point to start recording data. This starts all the other threads.
+        """
         for cur in self.currencies_to_analyse:
             db_con = self.create_connection(cur)
             self.create_rate_table(db_con, self.recorded_levels)
@@ -67,12 +70,18 @@ class MarketAnalysis(object):
         self.run_threads()
 
     def run_threads(self):
+        """
+        Start a thread for each currency we want to record.
+        """
         for cur in self.currencies_to_analyse:
             thread = threading.Thread(target=self.update_market_thread, args=(cur,))
             thread.deamon = True
             thread.start()
 
     def run_del_threads(self):
+        """
+        NOT YET IMPLEMENTED
+        """
         while True:
             for cur in self.currencies_to_analyse:
                 del_thread = threading.Thread(target=self.delete_old_data_thread, args=(cur,))
@@ -82,6 +91,9 @@ class MarketAnalysis(object):
             time.sleep(30)
 
     def update_market_thread(self, cur):
+        """
+        MOVING THIS NEXT COMMIT
+        """
         try:
             db_con = self.create_connection(cur)
             self.update_market(db_con, cur, self.recorded_levels)
@@ -91,6 +103,9 @@ class MarketAnalysis(object):
             traceback.print_exc()
 
     def delete_old_data_thread(self, cur, seconds):
+        """
+        NOT YET IMPLEMENTED
+        """
         while True:
             try:
                 db_con = self.create_connection(cur)
@@ -101,6 +116,14 @@ class MarketAnalysis(object):
                 traceback.print_exc()
 
     def update_market(self, db_con, cur, levels):
+        """
+        This is where the main work is done for recording the market data. The loop will not exit and continuously
+        polls Poloniex for the current loans in the book.
+
+        :param db_con: Connection to the database
+        :param cur: The currency (database) to remove data from
+        :param levels: The depth of offered rates to store
+        """
         while True:
             raw_data = self.api.return_loan_orders(cur, levels)['offers']
             market_data = []
@@ -122,7 +145,7 @@ class MarketAnalysis(object):
         Delete old data from the database
 
         :param db_con: Connection to the database
-        :param cur: The currency (table) to remove data from
+        :param cur: The currency (database) to remove data from
         :param seconds: The time in seconds of the oldest data to be kept
         """
         del_time = int(time.time()) - seconds
@@ -133,12 +156,26 @@ class MarketAnalysis(object):
 
     @staticmethod
     def get_day_difference(date_time):  # Will be a number of seconds since epoch
+        """
+        Get the difference in days between the supplied date_time and now.
+
+        :param date_time: A python date time object
+        :return: The number of days that have elapsed since date_time
+        """
         date1 = datetime.datetime.fromtimestamp(float(date_time))
         now = datetime.datetime.now()
         diff_days = (now - date1).days
         return diff_days
 
     def get_rate_list(self, cur, seconds):
+        """
+        Query the database (cur) for rates that are within the supplied number of seconds and now.
+
+        :param cur: The currency (database) to remove data from
+        :param seconds: The number of seconds between the oldest order returned and now.
+
+        :return: A pandas DataFrame object with named columns ('time', 'rate0', 'rate1',...)
+        """
         # Request more data from the DB than we need to allow for skipped seconds
         request_seconds = int(seconds * 1.1)
         if cur not in FULL_LIST:
@@ -164,6 +201,17 @@ class MarketAnalysis(object):
         return df
 
     def get_rate_suggestion(self, cur, rates=None, method='golden_cross'):
+        """
+        Return the suggested rate from analysed data. This is the main method for retrieving data from this module.
+        Currently this only supports returning of a single value, the suggested rate. However this will be expanded to
+        suggest a lower and higher rate for spreads.
+
+        :param cur: The currency (database) to remove data from
+        :param rates: This is used for unit testing only. It allows you to populate the data used for the suggestion.
+        :param method: The method by which you want to calculate the suggestion.
+
+        :return: A float with the suggested rate for the currency.
+        """
         if method == 'percentile':
             seconds = self.percentile_seconds
         elif method == 'golden_cross':
@@ -235,6 +283,19 @@ class MarketAnalysis(object):
         return result
 
     def get_golden_cross_rate(self, cur, rates_df, short_period, long_period, multiplier=None):
+        """
+        Golden cross is a bit of a misnomer. But we're trying to look at the short term moving average and the long
+        term moving average. If the short term is above the long term then the market is moving in a bullish manner and
+        it's a good time to lend. So return the short term moving average (scaled with the multiplier).
+
+        :param cur: The currency (database) to remove data from
+        :param rates_df: A pandas DataFrame with times and rates
+        :param short_period: Length in seconds of the short window for MACD calculations
+        :param long_period: Length in seconds of the long window for MACD calculations
+        :param multiplier: The multiplier to apply to the rate before returning.
+
+        :retrun: A float of the suggested, calculated rate
+        """
         if multiplier is None:
             multiplier = self.daily_min_multiplier
         short_rate = rates_df.rate0.tail(short_period).mean()
@@ -254,7 +315,7 @@ class MarketAnalysis(object):
         Create a connection to the sqlite DB. This will create a new file if one doesn't exist.  We can use :memory:
         here for db_path if we don't want to store the data on disk
 
-        :param cur: The currency (table) in the DB
+        :param cur: The currency (database) in the DB
         :param db_path: DB directory
         :return: Connection object or None
         """
