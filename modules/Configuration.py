@@ -108,11 +108,11 @@ def get_min_loan_sizes():
     return min_loan_sizes
 
 
-def get_currencies_list(option):
-    if config.has_option("BOT", option):
+def get_currencies_list(option, section="BOT"):
+    if config.has_option(section, option):
         full_list = ['STR', 'BTC', 'BTS', 'CLAM', 'DOGE', 'DASH', 'LTC', 'MAID', 'XMR', 'XRP', 'ETH', 'FCT']
         cur_list = []
-        raw_cur_list = config.get("BOT", option).split(",")
+        raw_cur_list = config.get(section, option).split(",")
         for raw_cur in raw_cur_list:
             cur = raw_cur.strip(' ').upper()
             if cur == 'ALL':

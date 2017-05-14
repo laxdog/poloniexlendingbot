@@ -34,11 +34,11 @@ except ImportError as ex:
 class MarketAnalysis(object):
     def __init__(self, config, api):
         self.open_files = {}
-        self.max_age = int(config.get('BOT', 'analyseMaxAge', 30, 1, 365))
-        self.currencies_to_analyse = config.get_currencies_list('analyseCurrencies')
-        self.update_interval = int(config.get('BOT', 'analyseUpdateInterval', 60, 10, 3600))
+        self.max_age = int(config.get('MarketAnalysis', 'analyseMaxAge', 30, 1, 365))
+        self.currencies_to_analyse = config.get_currencies_list('analyseCurrencies', 'MarketAnalysis')
+        self.update_interval = int(config.get('MarketAnalysis', 'analyseUpdateInterval', 60, 10, 3600))
         self.api = api
-        self.lending_style = int(config.get('BOT', 'lendingStyle', 50, 1, 99))
+        self.lending_style = int(config.get('MarketAnalysis', 'lendingStyle', 50, 1, 99))
         self.recorded_levels = 10
         self.modules_dir = os.path.dirname(os.path.realpath(__file__))
         self.top_dir = os.path.dirname(self.modules_dir)
