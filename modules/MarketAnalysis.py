@@ -72,12 +72,13 @@ class MarketAnalysis(object):
 
     def run_threads(self):
         """
-        Start a thread for each currency we want to record.
+        Start threads for each currency we want to record. (should be configurable later)
         """
-        for cur in self.currencies_to_analyse:
-            thread = threading.Thread(target=self.update_market_thread, args=(cur,))
-            thread.deamon = True
-            thread.start()
+        for _ in ['thread1']:
+            for cur in self.currencies_to_analyse:
+                thread = threading.Thread(target=self.update_market_thread, args=(cur,))
+                thread.deamon = True
+                thread.start()
 
     def run_del_threads(self):
         """
