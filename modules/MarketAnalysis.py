@@ -203,7 +203,7 @@ class MarketAnalysis(object):
         df = df.resample('1s', on='time').mean().ffill()
         return df
 
-    def get_rate_suggestion(self, cur, rates=None, method='golden_cross'):
+    def get_rate_suggestion(self, cur, rates=None, method='MACD'):
         """
         Return the suggested rate from analysed data. This is the main method for retrieving data from this module.
         Currently this only supports returning of a single value, the suggested rate. However this will be expanded to
@@ -217,7 +217,7 @@ class MarketAnalysis(object):
         """
         if method == 'percentile':
             seconds = self.percentile_seconds
-        elif method == 'golden_cross':
+        elif method == 'MACD':
             seconds = self.MACD_long_win_seconds
         else:
             print("Error: {0} method not recognised, falling back to percentile")
@@ -235,15 +235,15 @@ class MarketAnalysis(object):
                 # rates is a tuple with the first entry being unixtime
                 rates = [x[1] for x in rates]
                 return self.get_percentile(rates, self.lending_style)
-            elif method == 'golden_cross':
+            elif method == 'MACD':
                 seconds = self.MACD_long_win_seconds
                 if len(rates) < seconds * (self.data_tolerance / 100):
                     print(" : Need more data for analysis, still collecting. I have {0}/{1} records"
                           .format(len(rates), int(seconds * (self.data_tolerance / 100))))
                     return 0
-                rate = truncate(self.get_golden_cross_rate(cur, rates, self.MACD_long_win_seconds,
+                rate = truncate(self.get_MACD_rate(cur, rates, self.MACD_long_win_seconds,
                                                            self.MACD_short_win_seconds), 6)
-                print("Cur: {0}, Golden : {1}, Percent {2}, Best: {3}"
+                print("Cur: {0}, MACD : {1}, Percent {2}, Best: {3}"
                       .format(cur, rate, self.get_percentile(rates, self.lending_style), rates.rate0.iloc[-1]))
                 return rate
 
@@ -285,7 +285,7 @@ class MarketAnalysis(object):
         result = truncate(result, 6)
         return result
 
-    def get_golden_cross_rate(self, cur, rates_df, short_period, long_period, multiplier=None):
+    def get_MACD_rate(self, cur, rates_df, short_period, long_period, multiplier=None):
         """
         Golden cross is a bit of a misnomer. But we're trying to look at the short term moving average and the long
         term moving average. If the short term is above the long term then the market is moving in a bullish manner and
