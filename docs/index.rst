@@ -14,6 +14,7 @@ Contents:
 
    installation
    configuration
+   market_analysis
    contributing
 
 
