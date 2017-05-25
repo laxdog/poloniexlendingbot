@@ -5,6 +5,14 @@ Market Analysis
 
 Overview
 ``````````
+This feature records a currency's market and allows the bot see trends. With this data, we can compute a recommended minimum lending rate per currency to avoid lending at times when the rate dips.
+
+When this module is enabled it will start recording the lending rates for the market in an sqlite database. This will be seen in the market_data folder for your bot. This supersedes the previous method of storing it in a file. The files can be removed if you have them from older versions of the bot.
+
+There will be a DB created for each currency you wish to record. These can be enabled in the `analyseCurrencies`_ configuration option.  
+
+ .. warning:: The more currencies you record, the more data stored on disk and CPU processing time will be used. You will also not get as frequent results for the currencies, i.e. You may have trouble getting results for your configured ``analyseUpdateInterval`` This is explained further in the `Recording currencies`_ section. 
+
 A quick list of each config option and what they do
 
 ========================= =============================================================================================
@@ -20,32 +28,23 @@ A quick list of each config option and what they do
 `data_tolerance`_         The percentage of data that can be ignore as missing for the time requested in
                           ``percentile_seconds`` and ``MACD_long_win_seconds``
 `daily_min_method`_       Which method (MACD or percentile) to use for the daily min calculation
-`macd_multiplier`_        Only valid for MACD method. The figure to scale up the returned rate value from the MACD calculation
+`MACD_multiplier`_        Only valid for MACD method. The figure to scale up the returned rate value from the MACD calculation
 ========================= =============================================================================================
-
-This feature records a currency's market and allows the bot see trends. With this data, we can compute a recommended minimum lending rate per currency to avoid lending at times when the rate dips.
-
-When this module is enabled it will start recording the lending rates for the market in an sqlite database. This will be seen in the market_data folder for your bot. This supersedes the previous method of storing it in a file. The files can be removed if you have them from older versions of the bot.
-
-There will be a DB created for each currency you wish to record. These can be enabled in the `analyseCurrencies`_ configuration option.  
-
- .. warning:: The more currencies you record, the more data stored on disk and CPU processing time will be used. You will also not get as frequent results for the currencies, i.e. You may have trouble getting results for your configured ``analyseUpdateInterval`` This is explained further in the `Recording currencies`_ section. 
 
 The module has two main methods to calculate the minimum rate:
 
 Percentile
 ``````````
-This method takes all the data for the given time period and works out the Xth percentile figure for that set of data, where X is the ``lendingStyle`` that you are using. For example if you are using a ``lendingStyle`` of 85 and you had a list of rates like so
+This method takes all the data for the given time period (`percentile_seconds`_) and works out the Xth percentile (`lendingStyle`_) for that set of data. For example if you are using a ``lendingStyle`` of 85 and you had a list of rates like so
 
   :Example: 0.04, 0.04, 0.05, 0.05, 0.05, 0.05, 0.06, 0.06, 0.06, 0.07, 0.07, 0.07, 0.08, 0.08, 0.09, 0.09, 0.09, 0.10, 0.10, 0.10
 
 The 85th percentile would be 0.985 because 85% of rates are below this. The following configuration options should be considered when using the percentile calculation method:-
-* 
 
-MACD Moving Average Convergence Divergence
-''''''''''''''''''''''''''''''''''''''''''
 
-This method using moving averages to work out if it's a good time to lend or not. Currently this is only implemented to limit the minimum daily rate for a currency. This will be changing in the future. 
+MACD
+````
+Moving Average Convergence Divergence, this method using moving averages to work out if it's a good time to lend or not. Currently this is only implemented to limit the minimum daily rate for a currency. This will be changing in the future. 
 It by looking at the best rate that is available from the recorded market data for two windows, the long and short window, then taking an average of them both. If the short average is higher than the long average then it considers the market to be in a good place to lend (as the trend for rates is going up) and it will return a `suggested loan rate`_. If the long window is greater than the short window, then we will not lend as trend for rates is below what it should be.
 So for example:
 
@@ -59,7 +58,7 @@ Time  Short Long Suggested
 12:04 0.12  0.1  0.126
 ===== ===== ==== =========
 
-In this example, the bot would start to lend at 12:02 and it would suggest a minimum lending rate of 0.1 * `macd_multiplier`_, which by default is 1.05. Giving a rate of 0.105. This is then passed back to the main lendingbot where it will use your gaptop and gapbottom, along with spreads and all the other smarts to place loan offers.
+In this example, the bot would start to lend at 12:02 and it would suggest a minimum lending rate of 0.1 * `MACD_multiplier`_, which by default is 1.05. Giving a rate of 0.105. This is then passed back to the main lendingbot where it will use your gaptop and gapbottom, along with spreads and all the other smarts to place loan offers.
 
 Currently using this method gives the best results with well configured gaptop and gapbottom. This allows you to catch spikes in the market as see above. 
 
@@ -69,11 +68,11 @@ You can also use the `data_tolerance`_ to help with the amount of data required 
 This current implementation is basic in it's approach, but will be built upon with time. Results seem to be good though and we would welcome your feedback if you play around with it.
 
 suggested loan rate
-~~~~~~~~~~~~~~~~~~~
+'''''''''''''''''''
 If the average of the short window is greater than the average of the long window we will return the current
 
 configuring
-~~~~~~~~~~~
+'''''''''''
 
 The number of config options and combinations for this can be quite daunting. As time goes on I hope more people will feed back useful figures for all our different configuration set ups. I have found these to work well for my particular setup:
 
@@ -89,13 +88,11 @@ hideCoins               True
 analyseCurrencies       ETH,BTC
 analyseMaxAge           30
 analyseUpdateInterval   60
-lendingStyle            75
 MACD_long_win_seconds   1800
 MACD_short_win_seconds  150
-percentile_seconds      1800
-keep_history_seconds    1800
-recorded_levels         10
-data_tolerance          55
+keep_history_seconds    2000
+recorded_levels         2
+data_tolerance          40
 ======================= =========
 
 
@@ -112,7 +109,7 @@ There are a number of things to consider before configuring this section. The mo
 analyseCurrencies
 '''''''''''''''''
 
-The config option ``analyseCurrencies`` is the list of currencies to record (and analyse)
+``analyseCurrencies`` is the list of currencies to record (and analyse)
 
 None of the points below need be considered problematic unless you are planning to run with low (single digit seconds) timers on the bot. That is, the ``sleeptimeinactive``, ``sleeptimeactive`` and the ``analyseUpdateInterval``.
 
@@ -135,7 +132,7 @@ Notes       Don't worry about duplicates when using ``ACTIVE``, they are handled
 
 analyseMaxAge
 '''''''''''''
-Option ``analyseMaxAge`` is the maximum duration to store market data. Any data that is older that this number of seconds will be deleted from the DB.
+``analyseMaxAge`` is the maximum duration to store market data. Any data that is older that this number of seconds will be deleted from the DB.
 This delete runs periodically, so it is possible for the there to be data older than the specified age in the database, however it won't be there for long.
 
 configuration
@@ -148,7 +145,7 @@ Allowed range  3600 - ?
 analyseUpdateInterval
 '''''''''''''''''''''
 
-The ``analyseUpdateInterval`` is how long the bot will sleep between requests for rate data from Poloniex. Each coin has it's own thread for requests and each thread has it's own sleep.
+``analyseUpdateInterval`` is how long the bot will sleep between requests for rate data from Poloniex. Each coin has it's own thread for requests and each thread has it's own sleep.
 
 configuration
 ~~~~~~~~~~~~~
@@ -157,55 +154,10 @@ Default value  10
 Allowed range  1-60
 =============  ========================================================================================================
 
-
-lendingStyle
-''''''''''''
-
-- ``lendingStyle`` lets you choose the percentile of each currency's market to lend at.
-
-    - Default value: 75
-    - Allowed range: 1-99
-    - Recommendations: Conservative = 50, Moderate = 75, Aggressive = 90, Very Aggressive = 99
-    - This is a percentile, so choosing 75 would mean that your minimum will be the value that the market is above 25% of the recorded time.
-    - This will stop the bot from lending during a large dip in rate, but will still allow you to take advantage of any spikes in rate.
-
-percentile_seconds
-''''''''''''''''''
-
-``percentile_seconds`` is the number of seconds worth of data to use for the percentile calculation. This value is not used in MACD methods.
-
-configuration
-~~~~~~~~~~~~~
-=============  ========================================================================================================
-Default value  86400
-Allowed range  300 - ``analyseMaxAge``
-=============  ========================================================================================================
-
-
-MACD_long_win_seconds
-'''''''''''''''''''''
-
-configuration
-~~~~~~~~~~~~~
-=============  ========================================================================================================
-Default value  CHANGEME
-Allowed range  CHANGE ME
-=============  ========================================================================================================
-
-
-MACD_short_win_seconds
-''''''''''''''''''''''
-
-configuration
-~~~~~~~~~~~~~
-=============  ========================================================================================================
-Default value  CHANGEME
-Allowed range  CHANGE ME
-=============  ========================================================================================================
-
-
 keep_history_seconds
 ''''''''''''''''''''
+
+#TODO - I think I renamed analyseMaxAge 
 
 configuration
 ~~~~~~~~~~~~~
@@ -218,45 +170,115 @@ Allowed range  CHANGE ME
 recorded_levels
 '''''''''''''''
 
+``recorded_levels`` is the number of rates found in the current offers on poloniex that will be recorded in the db. 
+There is currently no reason to set this greater than 1 as we're not using the rest of the levels, this will change in the future though. You can raise it if you're examining the data yourself also. 
+
 configuration
 ~~~~~~~~~~~~~
 =============  ========================================================================================================
-Default value  CHANGEME
-Allowed range  CHANGE ME
+Default value  1
+Allowed range  1 - 999999
+=============  ========================================================================================================
+
+
+
+Analysing currencies
+````````````````````
+Everything in this section relates to how the analysis is carried out. So how much data is used and how it is used.
+
+lendingStyle
+''''''''''''
+
+#TODO - If this wasn't renamed, it needs to be. 
+
+``lendingStyle`` lets you choose the percentile of each currency's market to lend at.
+
+    - Default value: 75
+    - Allowed range: 1-99
+    - Recommendations: Conservative = 50, Moderate = 75, Aggressive = 90, Very Aggressive = 99
+    - This is a percentile, so choosing 75 would mean that your minimum will be the value that the market is above 25% of the recorded time.
+    - This will stop the bot from lending during a large dip in rate, but will still allow you to take advantage of any spikes in rate.
+
+percentile_seconds
+''''''''''''''''''
+
+``percentile_seconds`` is the number of seconds worth of data to use for the percentile calculation. This value is not used in `MACD`_ methods.
+
+configuration
+~~~~~~~~~~~~~
+=============  ========================================================================================================
+Default value  86400
+Allowed range  300 - ``analyseMaxAge``
+=============  ========================================================================================================
+
+
+MACD_long_win_seconds
+'''''''''''''''''''''
+
+``MACD_long_win_seconds`` is the number of seconds used for the long window average in the `MACD`_ method.
+
+configuration
+~~~~~~~~~~~~~
+=============  ========================================================================================================
+Default value  1800 (30 minutes)
+Allowed range  300 - ``analyseMaxAge``
+=============  ========================================================================================================
+
+
+MACD_short_win_seconds
+''''''''''''''''''''''
+
+``MACD_short_win_seconds`` is the number of seconds used for the short window average in the `MACD`_ method.
+
+configuration
+~~~~~~~~~~~~~
+=============  ========================================================================================================
+Default value  150 (2.5 minutes)
+Allowed range  25 - ``MACD_long_win_seconds``
 =============  ========================================================================================================
 
 
 data_tolerance
 ''''''''''''''
 
+``data_tolerance`` is the percentage of data that can be missed from poloniex and still considered that we have enough data to work with. 
+This was added because there are frequently problems with poloniex sending back data, also it's not always possible to get all the data you want if you are using multiple currencies. We are limited to 6 calls to poloniex every second.
+
 configuration
 ~~~~~~~~~~~~~
 =============  ========================================================================================================
-Default value  CHANGEME
-Allowed range  CHANGE ME
+Default value  50
+Allowed range  10 - 100
 =============  ========================================================================================================
 
 
 daily_min_method
 ''''''''''''''''
 
+``daily_min_method`` is the method in which you wish to calculate the daily_min for each currency. This is how we stop lending when the market rates are below average.
+This can be either MACD or percentile. See `MACD`_ and `Percentile`_ sections for more information.
+This will not change the `mindailyrate` that you have set for coins in the main config. So you will still never lend below what you have statically configured.
+
 configuration
 ~~~~~~~~~~~~~
-=============  ========================================================================================================
-Default value  CHANGEME
-Allowed range  CHANGE ME
-=============  ========================================================================================================
+============== ========================================================================================================
+Default value  MACD
+Allowed values MACD, percentile
+============== ========================================================================================================
 
 
 
-macd_multiplier
+MACD_multiplier
 '''''''''''''''
 
+``MACD_multiplier`` is what to scale up the returned average from the MACD calculation by. See `MACD`_ for more details.
+In the future this will probably be removed in favour of sending back spread information that can be used for gaptop and gapbottom.
+
 configuration
 ~~~~~~~~~~~~~
 =============  ========================================================================================================
-Default value  CHANGEME
-Allowed range  CHANGE ME
+Default value  1.05
+Allowed range  1 - 2
 =============  ========================================================================================================
 
 
