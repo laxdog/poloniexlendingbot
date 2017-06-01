@@ -107,10 +107,11 @@ Downloading the bot's files to Pythonanywhere
 #. You should now see ``~/poloniexlendingbot (master)$`` this means you are looking at the master branch and things are ok to continue.
 #. Run the command ``python2.7 lendingbot.py`` once to generate the default.cfg
 #. Modify the default.cfg with your settings (See  `Configuration <http://poloniexlendingbot.readthedocs.io/en/latest/configuration.html>`_.) You can do this with a tool called nano.
-#. Run ``nano defatul.cfg``, then use the arrow keys and backspace key to change ``YourAPIKey`` and ``YourSecret``. Make sure the layout of the file stays the same as it was. They should both be on separate lines.
+#. Run ``nano default.cfg``, then use the arrow keys and backspace key to change ``YourAPIKey`` and ``YourSecret``. Make sure the layout of the file stays the same as it was. They should both be on separate lines.
 #. Press ``Ctr+x`` to exit, then press ``y`` to save the file, then press enter to accept the file name as ``default.cfg``.
 #. Now you can start up the bot. Run ``python2.7 lendingbot.py``
 #. If it's working you will see ``Welcome to Poloniex Lending Bot`` displayed in the console.
+#. To update the bot just enter its directory, ``cd poloniexlendingbot`` and type, ``git pull``. This will not change the ``default.cfg`` file.
 
 .. note:: If you are running out of CPU time every day: It is recommended to use a high sleeptimeinactive time for this website, as they meter your CPU usage.
 
@@ -123,6 +124,8 @@ Creating the Web App (Optional)
 #. Set the static files to URL: ``/static/`` Directory: ``/home/<username>/poloniexlendingbot/www``
 #. Reload your website with the button at the top of the page.
 #. You will be able to access the webapp at ``http://<username>.pythonanywhere.com/static/lendingbot.html`` once it finishes setting up.
+#. To have the webserver communicate with your bot, you need to edit your settings (``default.cfg``) and uncomment (remove the ``#`` in front of) the following settings: ``jsonfile`` and ``jsonlogsize``. Make sure that ``startWebServer`` REMAINS commented.
+
 
 .. warning:: Do not use the built-in Simple Web Server on any host you do not control.
 
