@@ -34,7 +34,6 @@ except ImportError as ex:
 class MarketAnalysis(object):
     def __init__(self, config, api):
         self.open_files = {}
-        self.max_age = int(config.get('MarketAnalysis', 'analyseMaxAge', 30, 1, 365))
         self.currencies_to_analyse = config.get_currencies_list('analyseCurrencies', 'MarketAnalysis')
         self.update_interval = int(config.get('MarketAnalysis', 'analyseUpdateInterval', 60, 10, 3600))
         self.api = api

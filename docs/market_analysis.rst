@@ -17,7 +17,6 @@ A quick list of each config option and what they do
 
 ========================= =============================================================================================
 `analyseCurrencies`_      A list of each currency you wish to record and analyse
-`analyseMaxAge`_          The age (in seconds) of the oldest data you wish to keep in the DB
 `analyseUpdateInterval`_  The frequency between rates requested and stored in the DB
 `lendingStyle`_           The percentage used for the percentile calculation
 `percentile_seconds`_     The number of seconds to analyse when working out the percentile
@@ -86,7 +85,6 @@ gapbottom               400
 gaptop                  2000
 hideCoins               True
 analyseCurrencies       ETH,BTC
-analyseMaxAge           30
 analyseUpdateInterval   60
 MACD_long_win_seconds   1800
 MACD_short_win_seconds  150
@@ -130,40 +128,34 @@ Example     ``ACTIVE, BTC, CLAM`` will record and analyse BTC, CLAM, and any coi
 Notes       Don't worry about duplicates when using ``ACTIVE``, they are handled internally.
 ==========  ===========================================================================================================
 
-analyseMaxAge
-'''''''''''''
-``analyseMaxAge`` is the maximum duration to store market data. Any data that is older that this number of seconds will be deleted from the DB.
+keep_history_seconds
+''''''''''''''''''''
+``keep_history_seconds`` is the maximum duration to store market data. Any data that is older that this number of seconds will be deleted from the DB.
 This delete runs periodically, so it is possible for the there to be data older than the specified age in the database, however it won't be there for long.
 
 configuration
 ~~~~~~~~~~~~~
 =============  ========================================================================================================
-Default value  86400
-Allowed range  3600 - ?
+Default value  86400 (1 day)
+Allowed range  3600+
 =============  ========================================================================================================
 
 analyseUpdateInterval
 '''''''''''''''''''''
 
 ``analyseUpdateInterval`` is how long the bot will sleep between requests for rate data from Poloniex. Each coin has it's own thread for requests and each thread has it's own sleep.
+You are not guaranteed to get data at exactly the update interval. Setting it to 1 second, with several currencies
+each one of them will take up one of the 6 API calls that are allowed per second. These calls need to be used to place
+loans and other interactions with poloniex. 
+Also, it can take some time to get data back from poloniex, because there is a single thread making all the requests
+per currency, it will block the next request. I did have a multi threaded model for this currency recording, but it
+frequently created too many threads when polo was lagging, causing more harm than good.
 
 configuration
 ~~~~~~~~~~~~~
 =============  ========================================================================================================
 Default value  10
-Allowed range  1-60
-=============  ========================================================================================================
-
-keep_history_seconds
-''''''''''''''''''''
-
-#TODO - I think I renamed analyseMaxAge 
-
-configuration
-~~~~~~~~~~~~~
-=============  ========================================================================================================
-Default value  CHANGEME
-Allowed range  CHANGE ME
+Allowed range  1 - 3600 (1 hour)
 =============  ========================================================================================================
 
 
