@@ -35,20 +35,28 @@ class MarketAnalysis(object):
     def __init__(self, config, api):
         self.open_files = {}
         self.currencies_to_analyse = config.get_currencies_list('analyseCurrencies', 'MarketAnalysis')
-        self.update_interval = int(config.get('MarketAnalysis', 'analyseUpdateInterval', 60, 10, 3600))
+        self.update_interval = int(config.get('MarketAnalysis', 'analyseUpdateInterval', 10, 1, 3600))
         self.api = api
         self.lending_style = int(config.get('MarketAnalysis', 'lendingStyle', 50, 1, 99))
         self.recorded_levels = 10
         self.modules_dir = os.path.dirname(os.path.realpath(__file__))
         self.top_dir = os.path.dirname(self.modules_dir)
         self.db_dir = os.path.join(self.top_dir, 'market_data')
-        self.recorded_levels = int(config.get('MarketAnalysis', 'recorded_levels', 10, 1))
-        self.data_tolerance = float(config.get('MarketAnalysis', 'data_tolerance', 50, 50, 0))
-        self.MACD_long_win_seconds = int(config.get('MarketAnalysis', 'MACD_long_win_seconds', 1800, 60))
-        self.MACD_short_win_seconds = int(config.get('MarketAnalysis', 'MACD_short_win_seconds', 150, 1))
-        self.percentile_seconds = int(config.get('MarketAnalysis', 'percentile_seconds', 150, 1))
-        self.keep_history_seconds = int(config.get('MarketAnalysis', 'keep_history_seconds', 150, 1))
+        self.recorded_levels = int(config.get('MarketAnalysis', 'recorded_levels', 10, 1, 100))
+        self.data_tolerance = float(config.get('MarketAnalysis', 'data_tolerance', 15, 10, 99))
+        self.MACD_long_win_seconds = int(config.get('MarketAnalysis', 'MACD_long_win_seconds',
+                                                    1800, 60, 60 * 60 * 24 * 7))
+        self.MACD_short_win_seconds = int(config.get('MarketAnalysis', 'MACD_short_win_seconds',
+                                                     150, 1, self.MACD_long_win_seconds))
+        self.percentile_seconds = int(config.get('MarketAnalysis', 'percentile_seconds',
+                                                 60 * 60 * 24 * 3, 60 * 60 * 1, 60 * 60 * 24 * 7))
+        self.keep_history_seconds = int(config.get('MarketAnalysis', 'keep_history_seconds',
+                                                   int(self.MACD_long_win_seconds * 1.1),
+                                                   int(self.MACD_long_win_seconds * 1.1),
+                                                   60 * 60 * 24 * 7))
         self.daily_min_multiplier = float(config.get('Daily_min', 'multiplier', 1.05, 1))
+        self.delete_thread_sleep = float(config.get('MarketAnalysis', 'delete_thread_sleep',
+                                                    self.keep_history_seconds, 60, 60 * 60 * 2))
 
         if len(self.currencies_to_analyse) != 0:
             for currency in self.currencies_to_analyse:
@@ -68,6 +76,7 @@ class MarketAnalysis(object):
             self.create_rate_table(db_con, self.recorded_levels)
             db_con.close()
         self.run_threads()
+        self.run_del_threads()
 
     def run_threads(self):
         """
@@ -81,19 +90,17 @@ class MarketAnalysis(object):
 
     def run_del_threads(self):
         """
-        NOT YET IMPLEMENTED
+        Start thread to start the DB cleaning threads.
         """
-        while True:
+        for _ in ['thread1']:
             for cur in self.currencies_to_analyse:
-                del_thread = threading.Thread(target=self.delete_old_data_thread, args=(cur,))
-                del_thread.daemon = True
+                del_thread = threading.Thread(target=self.delete_old_data_thread, args=(cur, self.keep_history_seconds))
+                del_thread.daemon = False
                 del_thread.start()
-            # TODO set a reasonable default and allow config
-            time.sleep(30)
 
     def delete_old_data_thread(self, cur, seconds):
         """
-        NOT YET IMPLEMENTED
+        Thread to clean the DB.
         """
         while True:
             try:
@@ -103,6 +110,7 @@ class MarketAnalysis(object):
                 ex.message = ex.message if ex.message else str(ex)
                 print("Error in MarketAnalysis: {0}".format(ex.message))
                 traceback.print_exc()
+            time.sleep(self.delete_thread_sleep)
 
     def update_market_thread(self, cur, levels=None):
         """
@@ -202,7 +210,7 @@ class MarketAnalysis(object):
         df = df.resample('1s', on='time').mean().ffill()
         return df
 
-    def get_rate_suggestion(self, cur, rates=None, method='MACD'):
+    def get_rate_suggestion(self, cur, rates=None, method='percentile'):
         """
         Return the suggested rate from analysed data. This is the main method for retrieving data from this module.
         Currently this only supports returning of a single value, the suggested rate. However this will be expanded to
@@ -237,11 +245,11 @@ class MarketAnalysis(object):
             elif method == 'MACD':
                 seconds = self.MACD_long_win_seconds
                 if len(rates) < seconds * (self.data_tolerance / 100):
-                    print(" : Need more data for analysis, still collecting. I have {0}/{1} records"
-                          .format(len(rates), int(seconds * (self.data_tolerance / 100))))
+                    print("{0} : Need more data for analysis, still collecting. I have {1}/{2} records"
+                          .format(cur, len(rates), int(seconds * (self.data_tolerance / 100))))
                     return 0
                 rate = truncate(self.get_MACD_rate(cur, rates, self.MACD_long_win_seconds,
-                                                           self.MACD_short_win_seconds), 6)
+                                                   self.MACD_short_win_seconds), 6)
                 print("Cur: {0}, MACD : {1}, Percent {2}, Best: {3}"
                       .format(cur, rate, self.get_percentile(rates, self.lending_style), rates.rate0.iloc[-1]))
                 return rate

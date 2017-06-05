@@ -149,19 +149,19 @@ pushbullet_deviceid = 1234567890abcdef
 # PLEASE refer to the docs before attempting to use any of this. There are a lot of things here that will not work
 # correctly unless you understand what you are doing.
 analyseCurrencies = STR,BTC,BTS,CLAM,DOGE,DASH,LTC,MAID,XMR,XRP,ETH,FCT
-analyseMaxAge = 30
-analyseUpdateInterval = 60
 lendingStyle = 75
 MACD_long_win_seconds = 1800
 MACD_short_win_seconds = 150
-percentile_seconds = 1800
-keep_history_seconds = 1800
-recorded_levels = 10
-data_tolerance = 50
+# 3 days = 60 * 60 * 24 * 3 = 259200
+percentile_seconds = 259200
+# keep_history_seconds > (MACD_long_win_seconds * 1.1)
+keep_history_seconds = 2000
+# recorded_levels = 10
+# 15 %  means we need one data point every 9 seconds. You probably don't need to change this.
+# data_tolerance = 15
+# delete_thread_sleep = 60
 
 [Daily_min]
-method = 'golden_cross'
+# This defaults to percentile, MACD is the moving average calc and should give better rates
+# method = 'MACD'
 multiplier = 1.05
-
-[Spread]
-method = 'golden_cross'

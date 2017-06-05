@@ -52,7 +52,7 @@ def init(cfg, api1, log1, data, maxtolend, dry_run1, analysis, notify_conf1):
 
     global sleep_time, sleep_time_active, sleep_time_inactive, min_daily_rate, max_daily_rate, spread_lend, \
         gap_bottom, gap_top, xday_threshold, xdays, min_loan_size, end_date, coin_cfg, min_loan_sizes, dry_run, \
-        transferable_currencies, keep_stuck_orders, hide_coins, scheduler
+        transferable_currencies, keep_stuck_orders, hide_coins, scheduler, analysis_method
 
     sleep_time_active = float(Config.get("BOT", "sleeptimeactive", None, 1, 3600))
     sleep_time_inactive = float(Config.get("BOT", "sleeptimeinactive", None, 1, 3600))
@@ -71,6 +71,7 @@ def init(cfg, api1, log1, data, maxtolend, dry_run1, analysis, notify_conf1):
     transferable_currencies = Config.get_currencies_list('transferableCurrencies')
     keep_stuck_orders = Config.getboolean('BOT', "keepstuckorders", True)
     hide_coins = Config.getboolean('BOT', 'hideCoins', True)
+    analysis_method = Config.get('Daily_min', 'method', 'percentile')
 
     sleep_time = sleep_time_active  # Start with active mode
 
@@ -233,7 +234,7 @@ def get_min_daily_rate(cur):
             coin_cfg_alerted[cur] = True
             log.log('Using custom mindailyrate ' + str(coin_cfg[cur]['minrate'] * 100) + '% for ' + cur)
     if Analysis:
-        recommended_min = Analysis.get_rate_suggestion(cur)
+        recommended_min = Analysis.get_rate_suggestion(cur, analysis_method)
         if cur_min_daily_rate < recommended_min:
             cur_min_daily_rate = recommended_min
     return Decimal(cur_min_daily_rate)

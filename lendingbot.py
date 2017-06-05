@@ -45,7 +45,6 @@ json_output_enabled = Config.has_option('BOT', 'jsonfile') and Config.has_option
 
 log = Logger(Config.get('BOT', 'jsonfile', ''), Decimal(Config.get('BOT', 'jsonlogsize', -1)))
 api = Poloniex(Config.get("API", "apikey", None), Config.get("API", "secret", None))
-MA_api = Poloniex(Config.get("API", "apikey", None), Config.get("API", "secret", None))
 MaxToLend.init(Config, log)
 Data.init(api, log)
 Config.init(config_location, Data)
@@ -53,7 +52,7 @@ notify_conf = Config.get_notification_config()
 if Config.has_option('MarketAnalysis', 'analyseCurrencies'):
     from modules.MarketAnalysis import MarketAnalysis
     # Analysis.init(Config, api, Data)
-    analysis = MarketAnalysis(Config, MA_api)
+    analysis = MarketAnalysis(Config, api)
     analysis.run()
 else:
     analysis = None
