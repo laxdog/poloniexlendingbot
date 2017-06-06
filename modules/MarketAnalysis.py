@@ -137,7 +137,7 @@ class MarketAnalysis(object):
             try:
                 raw_data = self.api.return_loan_orders(cur, levels)['offers']
             except Exception as ex:
-                self.print_traceback("Error in returning data from Poloniex", ex)
+                self.print_traceback(ex, "Error in returning data from Poloniex")
             market_data = []
             for i in xrange(levels):
                 market_data.append(str(raw_data[i]['rate']))
@@ -151,7 +151,7 @@ class MarketAnalysis(object):
                 try:
                     db_con.execute(insert_sql)
                 except Exception as ex:
-                    self.print_traceback("Error inserting market data into DB", ex)
+                    self.print_traceback(ex, "Error inserting market data into DB")
 
     def delete_old_data(self, db_con, seconds):
         """
