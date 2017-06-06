@@ -33,7 +33,6 @@ except ImportError as ex:
 
 class MarketAnalysis(object):
     def __init__(self, config, api):
-        self.open_files = {}
         self.currencies_to_analyse = config.get_currencies_list('analyseCurrencies', 'MarketAnalysis')
         self.update_interval = int(config.get('MarketAnalysis', 'analyseUpdateInterval', 10, 1, 3600))
         self.api = api
@@ -112,6 +111,17 @@ class MarketAnalysis(object):
                 traceback.print_exc()
             time.sleep(self.delete_thread_sleep)
 
+    @staticmethod
+    def print_traceback(ex, log_message):
+        ex.message = ex.message if ex.message else str(ex)
+        print("{0}: {1}".format(log_message, ex.message))
+        traceback.print_exc()
+
+    @staticmethod
+    def print_exception_error(ex, log_message):
+        ex.message = ex.message if ex.message else str(ex)
+        print("{0}: {1}".format(log_message, ex.message))
+
     def update_market_thread(self, cur, levels=None):
         """
         This is where the main work is done for recording the market data. The loop will not exit and continuously
@@ -127,27 +137,21 @@ class MarketAnalysis(object):
             try:
                 raw_data = self.api.return_loan_orders(cur, levels)['offers']
             except Exception as ex:
-                ex.message = ex.message if ex.message else str(ex)
-                print("Error in returning data from Poloniex: {0}".format(ex.message))
-                traceback.print_exc()
+                self.print_traceback("Error in returning data from Poloniex", ex)
             market_data = []
             for i in xrange(levels):
                 market_data.append(str(raw_data[i]['rate']))
                 market_data.append(str(raw_data[i]['amount']))
-            market_data.append('0')
+            market_data.append('0')  # Percentile field not being filled yet.
             insert_sql = "INSERT INTO loans ("
             for level in xrange(levels):
-                insert_sql += "rate{0}, ".format(level)
-                insert_sql += "amnt{0}, ".format(level)
-            insert_sql += "percentile"
-            insert_sql += ") VALUES ({0});".format(','.join(market_data))
+                insert_sql += "rate{0}, amnt{0}, ".format(level)
+            insert_sql += "percentile) VALUES ({0});".format(','.join(market_data))  # percentile = 0
             with db_con:
                 try:
                     db_con.execute(insert_sql)
                 except Exception as ex:
-                    ex.message = ex.message if ex.message else str(ex)
-                    print("Error inserting market data into DB : {0}".format(ex.message))
-                    traceback.print_exc()
+                    self.print_traceback("Error inserting market data into DB", ex)
 
     def delete_old_data(self, db_con, seconds):
         """
@@ -222,43 +226,40 @@ class MarketAnalysis(object):
 
         :return: A float with the suggested rate for the currency.
         """
+        error_msg = "WARN: Exception found when analysing markets, if this happens for more than a couple minutes " +\
+                    "please create a Github issue so we can fix it. Otherwise, you can ignore it. Error"
+
         if method == 'percentile':
             seconds = self.percentile_seconds
         elif method == 'MACD':
             seconds = self.MACD_long_win_seconds
-        else:
-            print("Error: {0} method not recognised, falling back to percentile")
-            method == 'percentile'
-            seconds = self.percentile_seconds
 
-        try:
-            if rates is None:
+        if rates is None:
+            try:
                 rates = self.get_rate_list(cur, seconds)
-            elif cur not in self.open_files:
+            except Exception as ex:
+                self.print_exception_error(ex, error_msg)
                 return 0
-            if len(rates) == 0:
+        if len(rates) == 0:
+            return 0
+        if method == 'percentile':
+            # rates is a tuple with the first entry being unixtime
+            rates = [x[1] for x in rates]
+            return self.get_percentile(rates, self.lending_style)
+        elif method == 'MACD':
+            if len(rates) < seconds * (self.data_tolerance / 100):
+                print("{0} : Need more data for analysis, still collecting. I have {1}/{2} records"
+                      .format(cur, len(rates), int(seconds * (self.data_tolerance / 100))))
                 return 0
-            if method == 'percentile':
-                # rates is a tuple with the first entry being unixtime
-                rates = [x[1] for x in rates]
-                return self.get_percentile(rates, self.lending_style)
-            elif method == 'MACD':
-                seconds = self.MACD_long_win_seconds
-                if len(rates) < seconds * (self.data_tolerance / 100):
-                    print("{0} : Need more data for analysis, still collecting. I have {1}/{2} records"
-                          .format(cur, len(rates), int(seconds * (self.data_tolerance / 100))))
-                    return 0
+            try:
                 rate = truncate(self.get_MACD_rate(cur, rates, self.MACD_long_win_seconds,
                                                    self.MACD_short_win_seconds), 6)
-                print("Cur: {0}, MACD : {1}, Percent {2}, Best: {3}"
-                      .format(cur, rate, self.get_percentile(rates, self.lending_style), rates.rate0.iloc[-1]))
+                # print("Cur: {0}, MACD : {1}, Percent {2}, Best: {3}"
+                #       .format(cur, rate, self.get_percentile(rates, self.lending_style), rates.rate0.iloc[-1]))
                 return rate
-
-        except Exception as ex:
-            print("WARN: Exception found when analysing markets, if this happens for more than a couple minutes please "
-                  "make a Github issue so we can fix it. Otherwise, you can safely ignore it. Error:"
-                  "{0}".format(ex.message))
-            return 0
+            except Exception as ex:
+                self.print_exception_error(ex, error_msg)
+                return 0
 
     @staticmethod
     def percentile(N, percent, key=lambda x: x):
