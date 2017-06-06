@@ -196,7 +196,6 @@ class MarketAnalysis(object):
         if cur not in self.currencies_to_analyse:
             return []
         db_con = self.create_connection(cur)
-        # TODO Remove hardcoded values
         price_levels = ['rate0']
         rates = self.get_rates_from_db(db_con, from_date=time.time() - request_seconds, price_levels=price_levels)
         df = pd.DataFrame(rates)
@@ -311,12 +310,9 @@ class MarketAnalysis(object):
             multiplier = self.daily_min_multiplier
         short_rate = rates_df.rate0.tail(short_period).mean()
         long_rate = rates_df.rate0.tail(long_period).mean()
-        # TODO remove the sys writes
         if short_rate > long_rate:
-            sys.stdout.write("Short higher : ")
             rate = short_rate if rates_df.rate0.iloc[-1] < short_rate else rates_df.rate0.iloc[-1]
         else:
-            sys.stdout.write("Long  higher : ")
             rate = long_rate
         rate = rate * multiplier
         return rate
