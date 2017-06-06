@@ -234,7 +234,7 @@ def get_min_daily_rate(cur):
             coin_cfg_alerted[cur] = True
             log.log('Using custom mindailyrate ' + str(coin_cfg[cur]['minrate'] * 100) + '% for ' + cur)
     if Analysis:
-        recommended_min = Analysis.get_rate_suggestion(cur, analysis_method)
+        recommended_min = Analysis.get_rate_suggestion(cur, method=analysis_method)
         if cur_min_daily_rate < recommended_min:
             cur_min_daily_rate = recommended_min
     return Decimal(cur_min_daily_rate)
