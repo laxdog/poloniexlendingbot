@@ -72,6 +72,8 @@ def init(cfg, api1, log1, data, maxtolend, dry_run1, analysis, notify_conf1):
     keep_stuck_orders = Config.getboolean('BOT', "keepstuckorders", True)
     hide_coins = Config.getboolean('BOT', 'hideCoins', True)
     analysis_method = Config.get('Daily_min', 'method', 'percentile')
+    if analysis_method not in ['percentile', 'MACD']:
+        raise ValueError("analysis_method: \"{0}\" is not valid, must be percentile or MACD".format(analysis_method))
 
     sleep_time = sleep_time_active  # Start with active mode
 
