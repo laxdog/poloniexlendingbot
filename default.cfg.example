@@ -163,5 +163,5 @@ keep_history_seconds = 2000
 
 [Daily_min]
 # This defaults to percentile, MACD is the moving average calc and should give better rates
-# method = 'MACD'
+# method = MACD
 multiplier = 1.05

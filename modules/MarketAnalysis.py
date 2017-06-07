@@ -243,7 +243,6 @@ class MarketAnalysis(object):
             return 0
         if method == 'percentile':
             # rates is a tuple with the first entry being unixtime
-            rates = [x[1] for x in rates]
             return self.get_percentile(rates, self.lending_style)
         elif method == 'MACD':
             if len(rates) < seconds * (self.data_tolerance / 100):
@@ -288,7 +287,7 @@ class MarketAnalysis(object):
         if use_numpy:
             result = numpy.percentile(rates, int(lending_style))
         else:
-            result = self.percentile(sorted(rates), lending_style / 100.0)
+            result = self.percentile(sorted(rates.rate0.values.tolist()), lending_style / 100.0)
         result = truncate(result, 6)
         return result
 
