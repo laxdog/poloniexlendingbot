@@ -28,6 +28,7 @@ A quick list of each config option and what they do
                           ``percentile_seconds`` and ``MACD_long_win_seconds``
 `daily_min_method`_       Which method (MACD or percentile) to use for the daily min calculation
 `MACD_multiplier`_        Only valid for MACD method. The figure to scale up the returned rate value from the MACD calculation
+`ma_debug_logging`_        Print some extra info on what's happening with the rate calculations
 ========================= =============================================================================================
 
 The module has two main methods to calculate the minimum rate:
@@ -168,8 +169,8 @@ There is currently no reason to set this greater than 1 as we're not using the r
 configuration
 ~~~~~~~~~~~~~
 =============  ========================================================================================================
-Default value  1
-Allowed range  1 - 999999
+Default value  10
+Allowed range  1 - 100
 =============  ========================================================================================================
 
 
@@ -181,15 +182,17 @@ Everything in this section relates to how the analysis is carried out. So how mu
 lendingStyle
 ''''''''''''
 
-#TODO - If this wasn't renamed, it needs to be. 
-
 ``lendingStyle`` lets you choose the percentile of each currency's market to lend at.
 
-    - Default value: 75
-    - Allowed range: 1-99
     - Recommendations: Conservative = 50, Moderate = 75, Aggressive = 90, Very Aggressive = 99
     - This is a percentile, so choosing 75 would mean that your minimum will be the value that the market is above 25% of the recorded time.
     - This will stop the bot from lending during a large dip in rate, but will still allow you to take advantage of any spikes in rate.
+
+=============  ========================================================================================================
+Default value  75
+Allowed range  1-99
+=============  ========================================================================================================
+
 
 percentile_seconds
 ''''''''''''''''''
@@ -200,7 +203,7 @@ configuration
 ~~~~~~~~~~~~~
 =============  ========================================================================================================
 Default value  86400
-Allowed range  300 - ``analyseMaxAge``
+Allowed range  300 - ``keep_history_seconds``
 =============  ========================================================================================================
 
 
@@ -213,7 +216,7 @@ configuration
 ~~~~~~~~~~~~~
 =============  ========================================================================================================
 Default value  1800 (30 minutes)
-Allowed range  300 - ``analyseMaxAge``
+Allowed range  300 - ``keep_history_seconds``
 =============  ========================================================================================================
 
 
@@ -236,11 +239,14 @@ data_tolerance
 ``data_tolerance`` is the percentage of data that can be missed from poloniex and still considered that we have enough data to work with. 
 This was added because there are frequently problems with poloniex sending back data, also it's not always possible to get all the data you want if you are using multiple currencies. We are limited to 6 calls to poloniex every second.
 
+If you keep seeing messages saying ``Need more data for analysis, still collecting. I have Y/X records``, then you
+need to reduce this or reduce the number of currencies you are analysing.
+
 configuration
 ~~~~~~~~~~~~~
 =============  ========================================================================================================
-Default value  50
-Allowed range  10 - 100
+Default value  15
+Allowed range  10 - 90
 =============  ========================================================================================================
 
 
@@ -274,4 +280,14 @@ Allowed range  1 - 2
 =============  ========================================================================================================
 
 
+ma_debug_logging
+''''''''''''''''
 
+``ma_debug_logging`` when enabled will print to screen some of the internal information around the MACD and percentile calculations
+
+configuration
+~~~~~~~~~~~~~
+=============  ========================================================================================================
+Default value  False
+Allowed range  True, False
+=============  ========================================================================================================

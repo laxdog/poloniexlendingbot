@@ -36,26 +36,35 @@ class MarketAnalysis(object):
         self.currencies_to_analyse = config.get_currencies_list('analyseCurrencies', 'MarketAnalysis')
         self.update_interval = int(config.get('MarketAnalysis', 'analyseUpdateInterval', 10, 1, 3600))
         self.api = api
-        self.lending_style = int(config.get('MarketAnalysis', 'lendingStyle', 50, 1, 99))
+        self.lending_style = int(config.get('MarketAnalysis', 'lendingStyle', 75, 1, 99))
         self.recorded_levels = 10
         self.modules_dir = os.path.dirname(os.path.realpath(__file__))
         self.top_dir = os.path.dirname(self.modules_dir)
         self.db_dir = os.path.join(self.top_dir, 'market_data')
         self.recorded_levels = int(config.get('MarketAnalysis', 'recorded_levels', 10, 1, 100))
-        self.data_tolerance = float(config.get('MarketAnalysis', 'data_tolerance', 15, 10, 99))
+        self.data_tolerance = float(config.get('MarketAnalysis', 'data_tolerance', 15, 10, 90))
+        self.ma_debug_log = config.getboolean('MarketAnalysis', 'ma_debug_log')
         self.MACD_long_win_seconds = int(config.get('MarketAnalysis', 'MACD_long_win_seconds',
-                                                    1800, 60, 60 * 60 * 24 * 7))
-        self.MACD_short_win_seconds = int(config.get('MarketAnalysis', 'MACD_short_win_seconds',
-                                                     150, 1, self.MACD_long_win_seconds))
-        self.percentile_seconds = int(config.get('MarketAnalysis', 'percentile_seconds',
-                                                 60 * 60 * 24 * 3, 60 * 60 * 1, 60 * 60 * 24 * 7))
+                                                    1800,
+                                                    60,
+                                                    60 * 60 * 24 * 7))
         self.keep_history_seconds = int(config.get('MarketAnalysis', 'keep_history_seconds',
                                                    int(self.MACD_long_win_seconds * 1.1),
                                                    int(self.MACD_long_win_seconds * 1.1),
                                                    60 * 60 * 24 * 7))
+        self.MACD_short_win_seconds = int(config.get('MarketAnalysis', 'MACD_short_win_seconds',
+                                                     150,
+                                                     1,
+                                                     self.MACD_long_win_seconds))
+        self.percentile_seconds = int(config.get('MarketAnalysis', 'percentile_seconds',
+                                                 self.keep_history_seconds,
+                                                 60 * 60 * 1,
+                                                 self.keep_history_seconds))
         self.daily_min_multiplier = float(config.get('Daily_min', 'multiplier', 1.05, 1))
         self.delete_thread_sleep = float(config.get('MarketAnalysis', 'delete_thread_sleep',
-                                                    self.keep_history_seconds, 60, 60 * 60 * 2))
+                                                    self.keep_history_seconds,
+                                                    60,
+                                                    60 * 60 * 2))
 
         if len(self.currencies_to_analyse) != 0:
             for currency in self.currencies_to_analyse:
@@ -252,8 +261,9 @@ class MarketAnalysis(object):
             try:
                 rate = truncate(self.get_MACD_rate(cur, rates, self.MACD_long_win_seconds,
                                                    self.MACD_short_win_seconds), 6)
-                # print("Cur: {0}, MACD : {1}, Percent {2}, Best: {3}"
-                #       .format(cur, rate, self.get_percentile(rates, self.lending_style), rates.rate0.iloc[-1]))
+                if self.ma_debug_log:
+                    print("Cur: {0}, MACD : {1}, Percent {2}, Best: {3}"
+                          .format(cur, rate, self.get_percentile(rates, self.lending_style), rates.rate0.iloc[-1]))
                 return rate
             except Exception as ex:
                 self.print_exception_error(ex, error_msg)
@@ -311,8 +321,12 @@ class MarketAnalysis(object):
         long_rate = rates_df.rate0.tail(long_period).mean()
         if short_rate > long_rate:
             rate = short_rate if rates_df.rate0.iloc[-1] < short_rate else rates_df.rate0.iloc[-1]
+            if self.ma_debug_log:
+                sys.stdout.write("Short higher: ")
         else:
             rate = long_rate
+            if self.ma_debug_log:
+                sys.stdout.write("Long  higher: ")
         rate = rate * multiplier
         return rate
 

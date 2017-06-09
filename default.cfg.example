@@ -160,6 +160,7 @@ keep_history_seconds = 2000
 # 15 %  means we need one data point every 9 seconds. You probably don't need to change this.
 # data_tolerance = 15
 # delete_thread_sleep = 60
+# ma_debug_log = False
 
 [Daily_min]
 # This defaults to percentile, MACD is the moving average calc and should give better rates
