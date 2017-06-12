@@ -45,24 +45,28 @@ class MarketAnalysis(object):
         self.data_tolerance = float(config.get('MarketAnalysis', 'data_tolerance', 15, 10, 90))
         self.ma_debug_log = config.getboolean('MarketAnalysis', 'ma_debug_log')
         self.MACD_long_win_seconds = int(config.get('MarketAnalysis', 'MACD_long_win_seconds',
-                                                    1800,
-                                                    60,
+                                                    60 * 30 * 1 * 1,
+                                                    60 * 1 * 1 * 1,
                                                     60 * 60 * 24 * 7))
-        self.keep_history_seconds = int(config.get('MarketAnalysis', 'keep_history_seconds',
-                                                   int(self.MACD_long_win_seconds * 1.1),
-                                                   int(self.MACD_long_win_seconds * 1.1),
-                                                   60 * 60 * 24 * 7))
-        self.MACD_short_win_seconds = int(config.get('MarketAnalysis', 'MACD_short_win_seconds',
-                                                     150,
-                                                     1,
-                                                     self.MACD_long_win_seconds))
         self.percentile_seconds = int(config.get('MarketAnalysis', 'percentile_seconds',
-                                                 self.keep_history_seconds,
-                                                 60 * 60 * 1,
-                                                 self.keep_history_seconds))
+                                                 60 * 60 * 24 * 1,
+                                                 60 * 60 * 1 * 1,
+                                                 60 * 60 * 24 * 14))
+        if self.MACD_long_win_seconds > self.percentile_seconds:
+            keep_sec = self.MACD_long_win_seconds
+        else:
+            keep_sec = self.percentile_seconds
+        self.keep_history_seconds = int(config.get('MarketAnalysis', 'keep_history_seconds',
+                                                   int(keep_sec * 1.1),
+                                                   int(keep_sec * 1.1),
+                                                   60 * 60 * 24 * 14))
+        self.MACD_short_win_seconds = int(config.get('MarketAnalysis', 'MACD_short_win_seconds',
+                                                     int(self.MACD_long_win_seconds / 12),
+                                                     1,
+                                                     self.MACD_long_win_seconds / 2))
         self.daily_min_multiplier = float(config.get('Daily_min', 'multiplier', 1.05, 1))
         self.delete_thread_sleep = float(config.get('MarketAnalysis', 'delete_thread_sleep',
-                                                    self.keep_history_seconds,
+                                                    self.keep_history_seconds / 2,
                                                     60,
                                                     60 * 60 * 2))
 
