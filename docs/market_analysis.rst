@@ -76,11 +76,15 @@ configuring
 
 The number of config options and combinations for this can be quite daunting. As time goes on I hope more people will feed back useful figures for all our different configuration set ups. I have put in sensible defaults into the config for the MACD section. These are options that I have changed that aren't set by default and work better if you're using MACD as the rate calculation method. Change the currency to whatever you want, though best not use more than 3 really, as it slows down the calls to poloniex considerably. If you can use just one, then do it.
 
+I'm hoping that once more people test and report back results, this can be updated and more information passed to everyone else. 
+
+The most important is probably the hidecoins change to False. This means that it will always place loans so you don't need to have as low a resolution on the sleep timers. You also want to make sure the gaptop and gapbottom are high so you can get a large spread.
+
 ======================= =========
 Config                  Value
 ======================= =========
-sleeptimeactive         1
-sleeptimeinactive       1
+sleeptimeactive         10
+sleeptimeinactive       10
 spreadlend              3
 gapbottom               400
 gaptop                  3000
