@@ -74,7 +74,7 @@ If the average of the short window is greater than the average of the long windo
 configuring
 '''''''''''
 
-The number of config options and combinations for this can be quite daunting. As time goes on I hope more people will feed back useful figures for all our different configuration set ups. I have found these to work well for my particular setup:
+The number of config options and combinations for this can be quite daunting. As time goes on I hope more people will feed back useful figures for all our different configuration set ups. I have put in sensible defaults into the config for the MACD section. These are options that I have changed that aren't set by default and work better if you're using MACD as the rate calculation method. Change the currency to whatever you want, though best not use more than 3 really, as it slows down the calls to poloniex considerably. If you can use just one, then do it.
 
 ======================= =========
 Config                  Value
@@ -83,15 +83,9 @@ sleeptimeactive         1
 sleeptimeinactive       1
 spreadlend              3
 gapbottom               400
-gaptop                  2000
-hideCoins               True
+gaptop                  3000
+hideCoins               False
 analyseCurrencies       ETH,BTC
-analyseUpdateInterval   60
-MACD_long_win_seconds   1800
-MACD_short_win_seconds  150
-keep_history_seconds    2000
-recorded_levels         2
-data_tolerance          40
 ======================= =========
 
 
