@@ -52,7 +52,7 @@ def init(cfg, api1, log1, data, maxtolend, dry_run1, analysis, notify_conf1):
     notify_conf = notify_conf1
 
     global sleep_time, sleep_time_active, sleep_time_inactive, min_daily_rate, max_daily_rate, spread_lend, \
-        gap_bottom, gap_top, xday_threshold, xdays, min_loan_size, end_date, coin_cfg, min_loan_sizes, dry_run, \
+        gap_bottom_default, gap_top_default, xday_threshold, xdays, min_loan_size, end_date, coin_cfg, min_loan_sizes, dry_run, \
         transferable_currencies, keep_stuck_orders, hide_coins, scheduler, gap_mode_default, analysis_method
 
     sleep_time_active = float(Config.get("BOT", "sleeptimeactive", None, 1, 3600))
