@@ -105,6 +105,10 @@ try:
                 print "Timed out, will retry in " + str(Lending.get_sleep_time()) + "sec"
             elif isinstance(ex, BadStatusLine):
                 print "Caught BadStatusLine exception from Poloniex, ignoring."
+            elif 'HTTP Error 429' in ex.message:
+                additional_sleep = max(130.0-Lending.get_sleep_time(), 0)
+                print "IP has been banned for 120 seconds due too many requests. Sleeping for " + str(additional_sleep+Lending.get_sleep_time()) + " seconds."
+                time.sleep(additional_sleep)
             # Ignore all 5xx errors (server error) as we can't do anything about it (https://httpstatuses.com/)
             elif isinstance(ex, URLError):
                 print "Caught {0} from Poloniex, ignoring.".format(ex.message)

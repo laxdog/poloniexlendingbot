@@ -16,16 +16,23 @@ DB_INSERT = "INSERT OR REPLACE INTO 'history'" \
 DB_GET_LAST_TIMESTAMP = "SELECT max(close) as last_timestamp FROM 'history'"
 DB_GET_FIRST_TIMESTAMP = "SELECT min(close) as first_timestamp FROM 'history'"
 DB_GET_TOTAL_EARNED = "SELECT sum(earned) as total_earned, currency FROM 'history' GROUP BY currency"
-DB_GET_24HR_EARNED = "SELECT sum(earned) as total_earned, currency FROM 'history' " \
-                     "WHERE close BETWEEN datetime('now','-1 day') AND datetime('now') GROUP BY currency"
+DB_GET_YESTERDAY_EARNINGS = "SELECT sum(earned) as total_earned, currency FROM 'history' " \
+                     "WHERE close BETWEEN datetime('now', 'start of day', '-1 day') " \
+                     "AND datetime('now','start of day') GROUP BY currency"
 
 
 class AccountStats(Plugin):
     last_notification = 0
+    earnings = {}
 
     def on_bot_init(self):
         super(AccountStats, self).on_bot_init()
         self.init_db()
+
+    def before_lending(self):
+        for coin in self.earnings:
+            for key in self.earnings[coin]:
+                self.log.updateStatusValue(coin, key, self.earnings[coin][key])
 
     def after_lending(self):
         if self.get_db_version() > 0 \
@@ -103,18 +110,26 @@ class AccountStats(Plugin):
 
     def notify_stats(self):
         if self.get_db_version() == 0:
-            self.log.log_error('AccountStats DB isn\'t ready.')
+            if self.get_first_timestamp() is not None:
+                # only log an error if there are actually loans in DB
+                self.log.log_error('AccountStats DB isn\'t ready.')
             return
 
-        cursor = self.db.execute(DB_GET_24HR_EARNED)
+        self.earnings = {}
+        cursor = self.db.execute(DB_GET_YESTERDAY_EARNINGS)
         output = ''
         for row in cursor:
-            output += self.format_value(row[0]) + ' ' + str(row[1]) + ' in last 24hrs\n'
+            output += self.format_value(row[0]) + ' ' + str(row[1]) + ' Yesterday\n'
+            if row[1] not in self.earnings:
+                self.earnings[row[1]] = {}
+            self.earnings[row[1]]['yesterdayEarnings'] = row[0]
         cursor.close()
-
         cursor = self.db.execute(DB_GET_TOTAL_EARNED)
         for row in cursor:
             output += self.format_value(row[0]) + ' ' + str(row[1]) + ' in total\n'
+            if row[1] not in self.earnings:
+                self.earnings[row[1]] = {}
+            self.earnings[row[1]]['totalEarnings'] = row[0]
         cursor.close()
         if output != '':
             self.last_notification = sqlite3.time.time()
@@ -122,5 +137,6 @@ class AccountStats(Plugin):
             self.log.notify(output, self.notify_config)
             self.log.log(output)
 
-    def format_value(self,value):
-        return  '{0:0.12f}'.format(float(value)).rstrip('0').rstrip('.')
+    @staticmethod
+    def format_value(value):
+        return '{0:0.12f}'.format(float(value)).rstrip('0').rstrip('.')
