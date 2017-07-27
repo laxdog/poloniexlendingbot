@@ -226,6 +226,15 @@ class MarketAnalysis(object):
         df = df.resample('1s', on='time').mean().ffill()
         return df
 
+    def get_analysis_seconds(self, method):
+        """
+        Gets the correct number of seconds to use for anylsing data depeding on the method being used.
+        """
+        if method == 'percentile':
+            return self.percentile_seconds
+        elif method == 'MACD':
+            return self.MACD_long_win_seconds
+
     def get_rate_suggestion(self, cur, rates=None, method='percentile'):
         """
         Return the suggested rate from analysed data. This is the main method for retrieving data from this module.
@@ -241,30 +250,24 @@ class MarketAnalysis(object):
         error_msg = "WARN: Exception found when analysing markets, if this happens for more than a couple minutes " +\
                     "please create a Github issue so we can fix it. Otherwise, you can ignore it. Error"
 
-        if method == 'percentile':
-            seconds = self.percentile_seconds
-        elif method == 'MACD':
-            seconds = self.MACD_long_win_seconds
+        seconds = self.get_analysis_seconds(method)
 
         if rates is None:
             try:
                 rates = self.get_rate_list(cur, seconds)
+                rates[1]  # Checks len(rates) != 0
             except Exception as ex:
                 self.print_exception_error(ex, error_msg)
                 return 0
-        if len(rates) == 0:
-            return 0
         if method == 'percentile':
-            # rates is a tuple with the first entry being unixtime
-            return self.get_percentile(rates, self.lending_style)
+            return self.get_percentile(rates, self.lending_style)  # rates is a tuple with the first a entry of unixtime
         elif method == 'MACD':
             if len(rates) < seconds * (self.data_tolerance / 100):
                 print("{0} : Need more data for analysis, still collecting. I have {1}/{2} records"
                       .format(cur, len(rates), int(seconds * (self.data_tolerance / 100))))
                 return 0
             try:
-                rate = truncate(self.get_MACD_rate(cur, rates, self.MACD_long_win_seconds,
-                                                   self.MACD_short_win_seconds), 6)
+                rate = truncate(self.get_MACD_rate(cur, rates), 6)
                 if self.ma_debug_log:
                     print("Cur: {0}, MACD : {1}, Percent {2}, Best: {3}"
                           .format(cur, rate, self.get_percentile(rates, self.lending_style), rates.rate0.iloc[-1]))
@@ -305,7 +308,7 @@ class MarketAnalysis(object):
         result = truncate(result, 6)
         return result
 
-    def get_MACD_rate(self, cur, rates_df, short_period, long_period, multiplier=None):
+    def get_MACD_rate(self, cur, rates_df):
         """
         Golden cross is a bit of a misnomer. But we're trying to look at the short term moving average and the long
         term moving average. If the short term is above the long term then the market is moving in a bullish manner and
@@ -319,10 +322,8 @@ class MarketAnalysis(object):
 
         :retrun: A float of the suggested, calculated rate
         """
-        if multiplier is None:
-            multiplier = self.daily_min_multiplier
-        short_rate = rates_df.rate0.tail(short_period).mean()
-        long_rate = rates_df.rate0.tail(long_period).mean()
+        short_rate = rates_df.rate0.tail(self.MACD_short_win_seconds).mean()
+        long_rate = rates_df.rate0.tail(self.MACD_long_win_seconds).mean()
         if short_rate > long_rate:
             rate = short_rate if rates_df.rate0.iloc[-1] < short_rate else rates_df.rate0.iloc[-1]
             if self.ma_debug_log:
@@ -331,7 +332,7 @@ class MarketAnalysis(object):
             rate = long_rate
             if self.ma_debug_log:
                 sys.stdout.write("Long  higher: ")
-        rate = rate * multiplier
+        rate = rate * self.daily_min_multiplier
         return rate
 
     def create_connection(self, cur, db_dir=None, db_type='sqlite3'):
@@ -372,14 +373,13 @@ class MarketAnalysis(object):
             cursor.execute("PRAGMA journal_mode=wal")
             cursor.execute(create_table_sql)
 
-    def get_rates_from_db(self, db_con, from_date=None, to_date=None, price_levels=['rate0']):
+    def get_rates_from_db(self, db_con, from_date=None, price_levels=['rate0']):
         """
         Query the DB for all rates for a particular currency
 
         :param db_con: Connection to the database
         :param cur: The currency you want to get the rates for
         :param from_date: The earliest data you want, specified in unix time (seconds since epoch)
-        :param to_date: The latest data you want, specified in unix time (seconds since epoch)
         #TODO Change NEEDVARIABLE below
         :price_level: We record multiple price levels in the DB, the best offer being rate0, up to whateve you have
         configure NEEDVARIABLE to. You can also ask for VWR, which is a special volume weight rate designed to skip
@@ -388,12 +388,8 @@ class MarketAnalysis(object):
         with db_con:
             cursor = db_con.cursor()
             query = "SELECT unixtime, {0} FROM loans ".format(",".join(price_levels))
-            if from_date is not None and to_date is not None:
-                query += "WHERE unixtime > {0} AND unixtime < {1}".format(from_date, to_date)
             if from_date is not None:
                 query += "WHERE unixtime > {0}".format(from_date)
-            if to_date is not None:
-                query += "WHERE unixtime < {0}".format(to_date)
             query += ";"
             cursor.execute(query)
             return cursor.fetchall()
