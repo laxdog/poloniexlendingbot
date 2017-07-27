@@ -31,6 +31,10 @@ except ImportError as ex:
 #   total available, ignore it as dust.
 
 
+class MarketDataException(Exception):
+    pass
+
+
 class MarketAnalysis(object):
     def __init__(self, config, api):
         self.currencies_to_analyse = config.get_currencies_list('analyseCurrencies', 'MarketAnalysis')
@@ -256,22 +260,14 @@ class MarketAnalysis(object):
             try:
                 rates = self.get_rate_list(cur, seconds)
                 rates[1]  # Checks len(rates) != 0
-            except Exception as ex:
-                self.print_exception_error(ex, error_msg)
-                return 0
-        if method == 'percentile':
-            return self.get_percentile(rates, self.lending_style)  # rates is a tuple with the first a entry of unixtime
-        elif method == 'MACD':
-            if len(rates) < seconds * (self.data_tolerance / 100):
-                print("{0} : Need more data for analysis, still collecting. I have {1}/{2} records"
-                      .format(cur, len(rates), int(seconds * (self.data_tolerance / 100))))
-                return 0
-            try:
-                rate = truncate(self.get_MACD_rate(cur, rates), 6)
-                if self.ma_debug_log:
-                    print("Cur: {0}, MACD : {1}, Percent {2}, Best: {3}"
-                          .format(cur, rate, self.get_percentile(rates, self.lending_style), rates.rate0.iloc[-1]))
-                return rate
+                if method == 'percentile':
+                    return self.get_percentile(rates, self.lending_style)  # rates is a tuple, first entry is unixtime
+                if method == 'MACD':
+                    rate = truncate(self.get_MACD_rate(cur, rates), 6)
+                    if self.ma_debug_log:
+                        print("Cur: {0}, MACD : {1}, Percent {2}, Best: {3}"
+                              .format(cur, rate, self.get_percentile(rates, self.lending_style), rates.rate0.iloc[-1]))
+                    return rate
             except Exception as ex:
                 self.print_exception_error(ex, error_msg)
                 return 0
@@ -322,6 +318,11 @@ class MarketAnalysis(object):
 
         :retrun: A float of the suggested, calculated rate
         """
+        if len(rates_df) < self.get_analysis_seconds('MACD') * (self.data_tolerance / 100):
+            print("{0} : Need more data for analysis, still collecting. I have {1}/{2} records"
+                  .format(cur, len(rates_df), int(self.get_analysis_seconds('MACD') * (self.data_tolerance / 100))))
+            raise MarketDataException
+
         short_rate = rates_df.rate0.tail(self.MACD_short_win_seconds).mean()
         long_rate = rates_df.rate0.tail(self.MACD_long_win_seconds).mean()
         if short_rate > long_rate:
