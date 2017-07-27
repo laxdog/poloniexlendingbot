@@ -254,23 +254,20 @@ class MarketAnalysis(object):
         error_msg = "WARN: Exception found when analysing markets, if this happens for more than a couple minutes " +\
                     "please create a Github issue so we can fix it. Otherwise, you can ignore it. Error"
 
-        seconds = self.get_analysis_seconds(method)
-
-        if rates is None:
-            try:
-                rates = self.get_rate_list(cur, seconds)
-                rates[1]  # Checks len(rates) != 0
-                if method == 'percentile':
-                    return self.get_percentile(rates, self.lending_style)  # rates is a tuple, first entry is unixtime
-                if method == 'MACD':
-                    rate = truncate(self.get_MACD_rate(cur, rates), 6)
-                    if self.ma_debug_log:
-                        print("Cur: {0}, MACD : {1}, Percent {2}, Best: {3}"
-                              .format(cur, rate, self.get_percentile(rates, self.lending_style), rates.rate0.iloc[-1]))
-                    return rate
-            except Exception as ex:
-                self.print_exception_error(ex, error_msg)
-                return 0
+        try:
+            rates = self.get_rate_list(cur, self.get_analysis_seconds(method)) if rates is None else rates
+            rates[1]  # Checks len(rates) != 0
+            if self.ma_debug_log:
+                print("Cur:{0}, MACD:{1}, Perc:{2}, Best:{3}".format(cur, truncate(self.get_MACD_rate(cur, rates), 6),
+                                                                     self.get_percentile(rates, self.lending_style),
+                                                                     rates.rate0.iloc[-1]))
+            if method == 'percentile':
+                return self.get_percentile(rates, self.lending_style)  # rates is a tuple, first entry is unixtime
+            if method == 'MACD':
+                return truncate(self.get_MACD_rate(cur, rates), 6)
+        except Exception as ex:
+            self.print_exception_error(ex, error_msg)
+            return 0
 
     @staticmethod
     def percentile(N, percent, key=lambda x: x):
@@ -325,16 +322,17 @@ class MarketAnalysis(object):
 
         short_rate = rates_df.rate0.tail(self.MACD_short_win_seconds).mean()
         long_rate = rates_df.rate0.tail(self.MACD_long_win_seconds).mean()
+
+        if self.ma_debug_log:
+            sys.stdout.write("Short higher: ") if short_rate > long_rate else sys.stdout.write("Long  higher: ")
+
         if short_rate > long_rate:
-            rate = short_rate if rates_df.rate0.iloc[-1] < short_rate else rates_df.rate0.iloc[-1]
-            if self.ma_debug_log:
-                sys.stdout.write("Short higher: ")
+            if rates_df.rate0.iloc[-1] < short_rate:
+                return short_rate * self.daily_min_multiplier
+            else:
+                return rates_df.rate0.iloc[-1] * self.daily_min_multiplier
         else:
-            rate = long_rate
-            if self.ma_debug_log:
-                sys.stdout.write("Long  higher: ")
-        rate = rate * self.daily_min_multiplier
-        return rate
+            return long_rate * self.daily_min_multiplier
 
     def create_connection(self, cur, db_dir=None, db_type='sqlite3'):
         """
