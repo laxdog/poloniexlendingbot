@@ -20,7 +20,7 @@ except ImportError as ex:
           "It is recommended to install Numpy. Error: {0}".format(ex.message))
     use_numpy = False
 
-# TODO
+# Improvements
 # [ ] Provide something that takes into account dust offers. (The golden cross works well on BTC, not slower markets)
 # [ ] RE: above. Weighted rate.
 # [ ] Add docstring to everything
@@ -379,10 +379,7 @@ class MarketAnalysis(object):
         :param db_con: Connection to the database
         :param cur: The currency you want to get the rates for
         :param from_date: The earliest data you want, specified in unix time (seconds since epoch)
-        #TODO Change NEEDVARIABLE below
-        :price_level: We record multiple price levels in the DB, the best offer being rate0, up to whateve you have
-        configure NEEDVARIABLE to. You can also ask for VWR, which is a special volume weight rate designed to skip
-        'dust' offers
+        :price_level: We record multiple price levels in the DB, the best offer being rate0
         """
         with db_con:
             cursor = db_con.cursor()

@@ -86,8 +86,9 @@ Config                  Value
 sleeptimeactive         10
 sleeptimeinactive       10
 spreadlend              3
-gapbottom               400
-gaptop                  3000
+gapMode                 RawBTC
+gapbottom               40
+gaptop                  200
 hideCoins               False
 analyseCurrencies       ETH,BTC
 ======================= =========

@@ -153,24 +153,24 @@ pushbullet = False
 pushbullet_token = 1234567890abcdef
 pushbullet_deviceid = 1234567890abcdef
 
-[MarketAnalysis]
+#[MarketAnalysis]
 # PLEASE refer to the docs before attempting to use any of this. There are a lot of things here that will not work
 # correctly unless you understand what you are doing.
 analyseCurrencies = STR,BTC,BTS,CLAM,DOGE,DASH,LTC,MAID,XMR,XRP,ETH,FCT
 lendingStyle = 75
 MACD_long_win_seconds = 1800
-# MACD_short_win_seconds = 150
-# 3 days = 60 * 60 * 24 * 3 = 259200
+#MACD_short_win_seconds = 150
+#3 days = 60 * 60 * 24 * 3 = 259200
 percentile_seconds = 259200
-# keep_history_seconds > (greater of (percentile_seconds, MACD_long_win_seconds) * 1.1)
-# keep_history_seconds = 285120
-# recorded_levels = 10
+#keep_history_seconds > (greater of (percentile_seconds, MACD_long_win_seconds) * 1.1)
+#keep_history_seconds = 285120
+#recorded_levels = 10
 # 15 %  means we need one data point every 9 seconds. You probably don't need to change this.
-# data_tolerance = 15
-# delete_thread_sleep = 60
-# ma_debug_log = False
+#data_tolerance = 15
+#delete_thread_sleep = 60
+#ma_debug_log = False
 
 [Daily_min]
 # This defaults to percentile, MACD is the moving average calc and should give better rates
-# method = MACD
+#method = MACD
 multiplier = 1.05
