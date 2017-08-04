@@ -28,7 +28,7 @@ A quick list of each config option and what they do
                           ``percentile_seconds`` and ``MACD_long_win_seconds``
 `daily_min_method`_       Which method (MACD or percentile) to use for the daily min calculation
 `MACD_multiplier`_        Only valid for MACD method. The figure to scale up the returned rate value from the MACD calculation
-`ma_debug_logging`_        Print some extra info on what's happening with the rate calculations
+`ma_debug_log`_           Print some extra info on what's happening with the rate calculations
 ========================= =============================================================================================
 
 The module has two main methods to calculate the minimum rate:
@@ -92,6 +92,12 @@ gaptop                  200
 hideCoins               False
 analyseCurrencies       ETH,BTC
 ======================= =========
+
+notes
+'''''
+- MACD will default back to the percentile method if it can't function. This will happen at start up for a while when it's collecting data and can also happen if something goes wrong with the Database or other failures. It's basically a failsafe to make sure you're still using some sort of market analsis while MACD is offline.
+- You can turn on `ma_debug_log`_ to get some more information if things aren't working. 
+- When it's start up you will see ``Need more data for analysis, still collecting. I have Y/X records``, so long as it's still increasing then this is fine. If it always prints that message then you should change your `data_tolerance`_
 
 
 
@@ -279,10 +285,10 @@ Allowed range  1 - 2
 =============  ========================================================================================================
 
 
-ma_debug_logging
-''''''''''''''''
+ma_debug_log
+''''''''''''
 
-``ma_debug_logging`` when enabled will print to screen some of the internal information around the MACD and percentile calculations
+``ma_debug_log`` when enabled will print to screen some of the internal information around the MACD and percentile calculations
 
 configuration
 ~~~~~~~~~~~~~

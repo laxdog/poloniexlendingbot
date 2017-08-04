@@ -275,6 +275,12 @@ class MarketAnalysis(object):
                 return self.get_percentile(rates, self.lending_style)  # rates is a tuple, first entry is unixtime
             if method == 'MACD':
                 return truncate(self.get_MACD_rate(cur, rates), 6)
+        except MarketDataException:
+            if method != 'percentile':
+                print("Caught exception during {0} analysis, using percentile for now".format(method))
+                return self.get_percentile(rates, self.lending_style)
+            else:
+                raise
         except Exception as ex:
             self.print_exception_error(ex, error_msg, debug=self.ma_debug_log)
             return 0
@@ -305,7 +311,7 @@ class MarketAnalysis(object):
 
     def get_percentile(self, rates, lending_style, use_numpy=use_numpy):
         if use_numpy:
-            result = numpy.percentile(rates, int(lending_style))
+            result = numpy.percentile(rates.rate0, int(lending_style))
         else:
             result = self.percentile(sorted(rates.rate0.values.tolist()), lending_style / 100.0)
         result = truncate(result, 6)
