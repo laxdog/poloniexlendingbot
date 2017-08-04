@@ -135,9 +135,15 @@ class MarketAnalysis(object):
         traceback.print_exc()
 
     @staticmethod
-    def print_exception_error(ex, log_message):
+    def print_exception_error(ex, log_message, debug=False):
         ex.message = ex.message if ex.message else str(ex)
         print("{0}: {1}".format(log_message, ex.message))
+        if debug:
+            import traceback
+            ex_type, value, tb = sys.exc_info()
+            print("DEBUG: Class:{0} Args:{1}".format(ex.__class__, ex.args))
+            print("DEBUG: Type:{0} Value:{1} LineNo:{2}".format(ex_type, value, tb.tb_lineno))
+            traceback.print_exc()
 
     def update_market_thread(self, cur, levels=None):
         """
@@ -266,7 +272,7 @@ class MarketAnalysis(object):
             if method == 'MACD':
                 return truncate(self.get_MACD_rate(cur, rates), 6)
         except Exception as ex:
-            self.print_exception_error(ex, error_msg)
+            self.print_exception_error(ex, error_msg, debug=self.ma_debug_log)
             return 0
 
     @staticmethod
