@@ -262,7 +262,11 @@ class MarketAnalysis(object):
 
         try:
             rates = self.get_rate_list(cur, self.get_analysis_seconds(method)) if rates is None else rates
-            rates[1]  # Checks len(rates) != 0
+            if len(rates) == 0:
+                print("Rate list not populated")
+                if self.ma_debug_log:
+                    print("DEBUG: cur: {0} method:{1} rates:{2}")
+                return 0
             if self.ma_debug_log:
                 print("Cur:{0}, MACD:{1}, Perc:{2}, Best:{3}".format(cur, truncate(self.get_MACD_rate(cur, rates), 6),
                                                                      self.get_percentile(rates, self.lending_style),
