@@ -10,7 +10,7 @@ from sqlite3 import Error
 
 # Bot libs
 import modules.Configuration as Config
-from modules.Data import timestamp, truncate
+from modules.Data import truncate
 try:
     import numpy
     use_numpy = True
@@ -79,9 +79,8 @@ class MarketAnalysis(object):
                 try:
                     self.api.return_loan_orders(currency, 5)
                 except Exception as cur_ex:
-                    raise Exception("ERROR: You entered an incorrect currency: '" + currency +
-                                    "' to analyse the market of, please check your settings. Error message: "
-                                    + str(cur_ex))
+                    raise Exception("ERROR: You entered an incorrect currency: '{0}' to analyse the market of, please "
+                                    "check your settings. Error message: {1}".format(currency, cur_ex))
 
     def run(self):
         """
@@ -133,7 +132,6 @@ class MarketAnalysis(object):
         ex.message = ex.message if ex.message else str(ex)
         print("{0}: {1}".format(log_message, ex.message))
         traceback.print_exc()
-
 
     @staticmethod
     def print_exception_error(ex, log_message, debug=False):
