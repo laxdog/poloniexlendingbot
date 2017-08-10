@@ -9,8 +9,8 @@ import sqlite3 as lite
 from sqlite3 import Error
 
 # Bot libs
-from modules.Configuration import FULL_LIST
-from modules.Data import truncate
+import modules.Configuration as Config
+from modules.Data import timestamp, truncate
 try:
     import numpy
     use_numpy = True
@@ -77,11 +77,11 @@ class MarketAnalysis(object):
         if len(self.currencies_to_analyse) != 0:
             for currency in self.currencies_to_analyse:
                 try:
-                    self.api.api_query("returnLoanOrders", {'currency': currency, 'limit': '5'})
+                    self.api.return_loan_orders(currency, 5)
                 except Exception as cur_ex:
-                    print "Error: You entered an incorrect currency: '" + currency + \
-                          "' to analyse the market of, please check your settings. Error message: " + str(cur_ex)
-                    exit(1)
+                    raise Exception("ERROR: You entered an incorrect currency: '" + currency +
+                                    "' to analyse the market of, please check your settings. Error message: "
+                                    + str(cur_ex))
 
     def run(self):
         """
@@ -133,6 +133,7 @@ class MarketAnalysis(object):
         ex.message = ex.message if ex.message else str(ex)
         print("{0}: {1}".format(log_message, ex.message))
         traceback.print_exc()
+
 
     @staticmethod
     def print_exception_error(ex, log_message, debug=False):
@@ -214,6 +215,7 @@ class MarketAnalysis(object):
         """
         # Request more data from the DB than we need to allow for skipped seconds
         request_seconds = int(seconds * 1.1)
+        FULL_LIST = Config.get_all_currencies()
         if cur not in FULL_LIST:
             raise ValueError("{0} is not a valid currency, must be one of {1}".format(cur, FULL_LIST))
         if cur not in self.currencies_to_analyse:

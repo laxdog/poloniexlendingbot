@@ -1,6 +1,6 @@
 *.pyc
 *.swp
-*.cfg
+default.cfg
 www/botlog.json
 nohup.out
 error.log
@@ -8,4 +8,5 @@ error.log
 *.csv
 *.sqlite3
 
-docs/_build/
+docs
+market_data
