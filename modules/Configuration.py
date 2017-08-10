@@ -124,8 +124,8 @@ def get_min_loan_sizes():
     return min_loan_sizes
 
 
-def get_currencies_list(option):
-    if config.has_option("BOT", option):
+def get_currencies_list(option, section='BOT'):
+    if config.has_option(section, option):
         full_list = get_all_currencies()
         cur_list = []
         raw_cur_list = config.get(section, option).split(",")
