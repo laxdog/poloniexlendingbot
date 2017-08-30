@@ -174,6 +174,9 @@ class MarketAnalysis(object):
                     db_con.execute(insert_sql)
                 except Exception as ex:
                     self.print_traceback(ex, "Error inserting market data into DB")
+            if Config.get_exchange() == 'BITFINEX':
+                # We don't have a coach for bitfinex, so sleep here
+                time.sleep(5)
 
     def delete_old_data(self, db_con, seconds):
         """
@@ -268,9 +271,9 @@ class MarketAnalysis(object):
                     print("DEBUG: cur: {0} method:{1} rates:{2}")
                 return 0
             if self.ma_debug_log:
-                print("Cur:{0}, MACD:{1}, Perc:{2}, Best:{3}".format(cur, truncate(self.get_MACD_rate(cur, rates), 6),
-                                                                     self.get_percentile(rates, self.lending_style),
-                                                                     rates.rate0.iloc[-1]))
+                print("Cur:{0}, MACD:{1:.6f}, Perc:{2:.6f}, Best:{3:.6f}".format(cur, truncate(self.get_MACD_rate(cur, rates), 6),
+                                                                                 self.get_percentile(rates, self.lending_style),
+                                                                                 rates.rate0.iloc[-1]))
             if method == 'percentile':
                 return self.get_percentile(rates, self.lending_style)  # rates is a tuple, first entry is unixtime
             if method == 'MACD':
