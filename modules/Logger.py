@@ -7,6 +7,7 @@ import sys
 import time
 
 import ConsoleUtils
+import modules.Configuration as Config
 from RingBuffer import RingBuffer
 from Notify import send_notification
 
@@ -47,6 +48,7 @@ class JsonOutput(object):
         self.clearStatusValues()
         self.jsonOutputLog = RingBuffer(logLimit)
         self.jsonOutput['exchange'] = exchange
+        self.jsonOutput['label'] = Config.get("BOT", "label", "Lending Bot")
 
     def status(self, status, time, days_remaining_msg):
         self.jsonOutput["last_update"] = time + days_remaining_msg
@@ -61,6 +63,13 @@ class JsonOutput(object):
             self.jsonOutput["log"] = self.jsonOutputLog.get()
             f.write(unicode(json.dumps(self.jsonOutput, ensure_ascii=False, sort_keys=True)))
             f.close()
+
+    def addSectionLog(self, section, key, value):
+        if section not in self.jsonOutput:
+            self.jsonOutput[section] = {}
+        if key not in self.jsonOutput[section]:
+            self.jsonOutput[section][key] = {}
+        self.jsonOutput[section][key] = value
 
     def statusValue(self, coin, key, value):
         if coin not in self.jsonOutputCoins:
@@ -120,6 +129,10 @@ class Logger(object):
         if days_remaining != '':
             self._daysRemaining = days_remaining
         self.output.status(self._lent, self.timestamp(), self._daysRemaining)
+
+    def addSectionLog(self, section, key, value):
+        if hasattr(self.output, 'addSectionLog'):
+            self.output.addSectionLog(section, key, value)
 
     def updateStatusValue(self, coin, key, value):
         if hasattr(self.output, 'statusValue'):

@@ -21,6 +21,7 @@ class Bitfinex(ExchangeApi):
         self.ticker = {}
         self.tickerTime = 0
         self.usedCurrencies = []
+        self.timeout = int(self.cfg.get("BOT", "timeout", 30, 1, 180))
 
     @property
     def _nonce(self):
@@ -28,7 +29,7 @@ class Bitfinex(ExchangeApi):
         Returns a nonce
         Used in authentication
         '''
-        return str(time.time())
+        return str(int(round(time.time() * 1000)))
 
     def _sign_payload(self, payload):
         j = json.dumps(payload)
@@ -46,12 +47,12 @@ class Bitfinex(ExchangeApi):
         try:
             r = {}
             if (request == 'get'):
-                r = requests.get(self.url + command)
+                r = requests.get(self.url + command, timeout=self.timeout)
             else:
-                r = requests.post(self.url + command, headers=payload, verify=verify)
+                r = requests.post(self.url + command, headers=payload, verify=verify, timeout=self.timeout)
 
             if r.status_code != 200:
-                if (r.status_code in [502, 504, 522]):
+                if (r.status_code == 502 or r.status_code in range(520, 527, 1)):
                     raise ApiError('API Error ' + str(r.status_code) +
                                    ': The web server reported a bad gateway or gateway timeout error.')
                 else:
@@ -177,7 +178,8 @@ class Bitfinex(ExchangeApi):
         })
 
         bfxResp = self._post("balances", signed_payload)
-        balances = Bitfinex2Poloniex.convertAccountBalances(bfxResp, account)
+        filtered_response = [x for x in bfxResp if x['type'] != 'conversion']
+        balances = Bitfinex2Poloniex.convertAccountBalances(filtered_response, account)
 
         if 'lending' in balances:
             self.usedCurrencies = []
@@ -292,7 +294,6 @@ class Bitfinex(ExchangeApi):
         https://bitfinex.readme.io/v1/reference#rest-auth-balance-history
         '''
         history = []
-        idInc = 0
         allCurrencies = self.cfg.get_all_currencies()
         for curr in allCurrencies:
             signed_payload = self._sign_payload({
@@ -309,7 +310,7 @@ class Bitfinex(ExchangeApi):
                 if 'Margin Funding Payment' in entry['description']:
                     amount = float(entry['amount'])
                     history.append({
-                        "id": int(float(entry['timestamp'])) + idInc,
+                        "id": int(float(entry['timestamp'])),
                         "currency": curr,
                         "rate": "0.0",
                         "amount": "0.0",
@@ -320,6 +321,5 @@ class Bitfinex(ExchangeApi):
                         "open": Bitfinex2Poloniex.convertTimestamp(entry['timestamp']),
                         "close": Bitfinex2Poloniex.convertTimestamp(entry['timestamp'])
                     })
-                    idInc += 1
 
         return history

@@ -296,6 +296,7 @@ Advanced logging and Web Display
 
     - Default value: Commented out, uncomment to enable.
     - The server page can be accessed locally, at ``http://localhost:8000/lendingbot.html`` by default.
+    - Forces ``jsonfile`` to be set using ``www/botlog.json`` (unless otherwise configured)
     - You must close bot with a keyboard interrupt (CTRL-C on Windows) to properly shutdown the server and release the socket, otherwise you may have to wait several minutes for it to release itself.
 
 - ``customWebServerAddress`` is the IP address that the webserver can be found at.
@@ -330,6 +331,12 @@ Advanced logging and Web Display
     - Acceptable values: BTC, USDT, Any coin with a direct Poloniex BTC trading pair (ex. DOGE, MAID, ETH), Currencies that have a BTC exchange rate on blockchain.info (i.e. EUR, USD)
     - Will be a close estimate, due to unexpected market fluctuations, trade fees, and other unforseeable factors.
 
+- ``label`` is a custom name of the bot, that will be displayed in html page.
+
+    - Default value: Lending Bot
+    - Allowed values: Any literal string
+
+
 Plugins
 -------
 
@@ -347,6 +354,11 @@ Current implementation sends a earnings summary Notification (see Notifications 
 To enable the plugin add ``AccountStats`` to the ``plugins`` config options, example::
 
     plugins = AccountStats
+
+There is an optional setting to change how frequently this plugin reports. By default, once per day. Example::
+
+    [ACCOUNTSTATS]
+    ReportInterval = 1800
 
 Be aware that first initialization might take longer as the bot will fetch all the history.
 
